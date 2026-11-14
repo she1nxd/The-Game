@@ -1,5 +1,49 @@
 extends Node3D
 
+class OrderCard extends Control:
+	var order_data: Dictionary
+
+	func _init(data: Dictionary) -> void:
+		order_data = data
+		custom_minimum_size = Vector2(253, 132)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var patience: int = order_data.get("patience", 0)
+		var card_color := Color("#fff3d0")
+		var border_color := Color("#d5b978")
+		draw_style_box(_panel_style(card_color, border_color, 8, 1), Rect2(Vector2.ZERO, size))
+
+		draw_rect(Rect2(10, 9, size.x - 20, 8), Color("#c7c5b8"))
+		draw_rect(Rect2(10, 9, (size.x - 20) * patience / 100.0, 8), Color("#61b879"))
+		draw_circle(Vector2(size.x - 15, 13), 3, Color("#ef6b62"))
+
+		draw_circle(Vector2(35, 54), 19, Color("#f1e4c4"))
+		draw_arc(Vector2(35, 54), 19, 0, TAU, 24, Color("#b7c8ce"), 2)
+		draw_circle(Vector2(35, 53), 13, Color("#d95846"))
+		draw_arc(Vector2(35, 53), 13, 0, PI, 16, Color("#f2c56b"), 2)
+		draw_string(ThemeDB.fallback_font, Vector2(21, 82), "SOUP", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+
+		draw_string(ThemeDB.fallback_font, Vector2(64, 43), "TOMATO SOUP", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#26384a"))
+		draw_string(ThemeDB.fallback_font, Vector2(64, 78), "INGREDIENT", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#66737b"))
+		draw_circle(Vector2(78, 101), 10, Color("#ed514b"))
+		draw_string(ThemeDB.fallback_font, Vector2(74, 105), "T", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff3d0"))
+		draw_string(ThemeDB.fallback_font, Vector2(94, 105), "TOMATO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+
+		draw_string(ThemeDB.fallback_font, Vector2(166, 101), "COOK AT", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#66737b"))
+		draw_rect(Rect2(166, 108, 24, 10), Color("#5d6872"))
+		draw_circle(Vector2(178, 107), 9, Color("#303d4a"))
+		draw_arc(Vector2(178, 107), 9, 0, TAU, 16, Color("#d5a74c"), 2)
+		draw_string(ThemeDB.fallback_font, Vector2(195, 115), "POT", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+
+	func _panel_style(fill: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
+		var style := StyleBoxFlat.new()
+		style.bg_color = fill
+		style.border_color = border
+		style.set_border_width_all(border_width)
+		style.set_corner_radius_all(radius)
+		return style
+
 const FLOOR_SIZE := Vector3(20, 0.3, 13)
 const STATION_NAMES := {
 	"crate": "TOMATO CRATE",
@@ -29,6 +73,7 @@ var station_nodes: Dictionary = {}
 var time_label: Label
 var score_label: Label
 var order_label: RichTextLabel
+var orders_container: VBoxContainer
 var status_label: Label
 var feedback_label: Label
 var timer: Timer
@@ -481,7 +526,13 @@ func _interact(station_id: String) -> void:
 	_update_hud()
 
 func _spawn_order() -> void:
-	orders.append({"id": next_order_id, "patience": 100})
+	orders.append({
+		"id": next_order_id,
+		"patience": 100,
+		"recipe": "Tomato Soup",
+		"ingredients": ["Tomato", "Salt", "Plate"],
+		"station": "Stock Pot"
+	})
 	next_order_id += 1
 
 func _tick() -> void:
@@ -528,47 +579,22 @@ func _unhandled_input(event: InputEvent) -> void:
 func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
-	var top := ColorRect.new()
-	top.color = Color("#142235e6")
-	top.position = Vector2(22, 18)
-	top.size = Vector2(1056, 72)
-	canvas.add_child(top)
-	time_label = _label("TIME  2:00", Color("#ef6b62"), 20)
-	time_label.position = Vector2(42, 35)
-	canvas.add_child(time_label)
-	score_label = _label("SCORE  0  /  COMBO x0", Color("#f4ca67"), 20)
-	score_label.position = Vector2(250, 35)
+	score_label = _label("SCORE  0", Color("#f4ca67"), 20)
+	score_label.position = Vector2(42, 638)
 	canvas.add_child(score_label)
-	var title := _label("MERRY MEALS  •  3D CHRISTMAS SERVICE", Color("#fff3d0"), 20)
-	title.position = Vector2(650, 35)
-	canvas.add_child(title)
+	time_label = _label("TIME  2:00", Color("#ef6b62"), 20)
+	time_label.position = Vector2(910, 638)
+	canvas.add_child(time_label)
 	var side := ColorRect.new()
 	side.color = Color("#142235e6")
-	side.position = Vector2(790, 110)
-	side.size = Vector2(275, 300)
+	side.position = Vector2(22, 18)
+	side.size = Vector2(275, 460)
 	canvas.add_child(side)
-	var orders_title := _label("CUSTOMER ORDERS", Color("#f4ca67"), 16)
-	orders_title.position = Vector2(812, 128)
-	canvas.add_child(orders_title)
-	order_label = RichTextLabel.new()
-	order_label.bbcode_enabled = true
-	order_label.fit_content = true
-	order_label.add_theme_font_size_override("normal_font_size", 15)
-	order_label.add_theme_color_override("default_color", Color("#fff3d0"))
-	order_label.position = Vector2(812, 165)
-	order_label.size = Vector2(230, 215)
-	canvas.add_child(order_label)
-	var bottom := ColorRect.new()
-	bottom.color = Color("#142235e6")
-	bottom.position = Vector2(22, 590)
-	bottom.size = Vector2(1056, 88)
-	canvas.add_child(bottom)
-	status_label = _label("", Color("#fff3d0"), 15)
-	status_label.position = Vector2(42, 602)
-	canvas.add_child(status_label)
-	feedback_label = _label(feedback, feedback_color, 15)
-	feedback_label.position = Vector2(42, 635)
-	canvas.add_child(feedback_label)
+	orders_container = VBoxContainer.new()
+	orders_container.position = Vector2(33, 30)
+	orders_container.size = Vector2(253, 395)
+	orders_container.add_theme_constant_override("separation", 8)
+	canvas.add_child(orders_container)
 
 func _label(text: String, color: Color, size: int) -> Label:
 	var label := Label.new()
@@ -578,24 +604,22 @@ func _label(text: String, color: Color, size: int) -> Label:
 	return label
 
 func _update_hud() -> void:
-	if not order_label:
+	if not orders_container:
 		return
 	time_label.text = "TIME  %d:%02d" % [time_left / 60, time_left % 60]
-	score_label.text = "SCORE  %d  /  COMBO x%d" % [score, combo]
+	score_label.text = "SCORE  %d" % score
 	var pot_status := "Pot: ready" if soup_ready else "Pot: cooking %.1fs" % cooking_remaining if cooking_remaining > 0.0 else "Pot: empty"
 	if cutting_remaining > 0.0:
 		pot_status = "Board: chopping %.1fs" % cutting_remaining
 	var board_status := "Board: chopped tomato" if board_has_chopped_tomato else "Board: empty"
-	status_label.text = "HOLDING: %s    |    %s    |    %s    |    %s" % [held_item, board_status, pot_status, "E: " + STATION_NAMES[nearest_station] if nearest_station else "Walk to a station"]
-	var order_text := ""
-	for index in range(orders.size()):
-		var patience: int = orders[index].patience
-		var patience_color := "#61d39a" if patience >= 66 else "#f4ca67" if patience >= 33 else "#ef6b62"
-		var bar := "[color=#61d39a]███[/color][color=#f4ca67]███[/color][color=#ef6b62]████[/color]"
-		order_text += "[font_size=15]CUSTOMER %d[/font_size]\n%s [color=%s]●[/color]\n[color=#b4c6cf]%d%% patience[/color]\n\n" % [index + 1, bar, patience_color, patience]
-	order_label.text = order_text if order_text else "No customers waiting."
-	feedback_label.text = feedback
-	feedback_label.add_theme_color_override("font_color", feedback_color)
+	for child in orders_container.get_children():
+		child.queue_free()
+	if orders.is_empty():
+		var empty_label := _label("No customers waiting.", Color("#b4c6cf"), 13)
+		orders_container.add_child(empty_label)
+	else:
+		for order in orders:
+			orders_container.add_child(OrderCard.new(order))
 
 func _feedback(message: String, color: Color) -> void:
 	feedback = message
