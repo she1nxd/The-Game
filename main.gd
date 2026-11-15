@@ -67,9 +67,8 @@ var combo := 0
 var time_left := 120
 var orders: Array[Dictionary] = []
 var next_order_id := 1
-var feedback := "WASD / arrows to move. Walk near a station and press E."
-var feedback_color := Color("#70c8ed")
 var station_nodes: Dictionary = {}
+var restart_label: Label
 var time_label: Label
 var score_label: Label
 var order_label: RichTextLabel
@@ -417,101 +416,76 @@ func _interact(station_id: String) -> void:
 			if held_item == "Tomato":
 				_set_held_item("Empty hands")
 				_start_put_animation()
-				_feedback("Tomato returned to the crate.", Color("#61d39a"))
 				return
 			if held_item != "Empty hands":
-				_feedback("Your hands are full. Use the item first.", Color("#ef6b62"))
 				return
 			_set_held_item("Tomato")
 			_start_put_animation()
-			_feedback("You took a tomato from the crate. Take it to the stock pot.", Color("#61d39a"))
 		"cut":
 			if held_item == "Chopped tomato":
 				if board_has_chopped_tomato:
-					_feedback("The cutting board already has chopped tomato.", Color("#ef6b62"))
 					return
 				board_has_chopped_tomato = true
 				_set_held_item("Empty hands")
 				_start_put_animation()
 				_update_board_visual()
-				_feedback("Chopped tomato placed back on the cutting board.", Color("#61d39a"))
 				return
 			if held_item == "Tomato" and (board_has_tomato or board_has_chopped_tomato):
-				_feedback("The cutting board is occupied. Pick up the chopped tomato first.", Color("#ef6b62"))
 				return
 			if held_item == "Tomato":
 				board_has_tomato = true
 				_set_held_item("Empty hands")
 				_update_board_visual()
 				_start_put_animation()
-				_feedback("Tomato placed on the cutting board. Press E to chop it.", Color("#61d39a"))
 				return
 			if held_item == "Empty hands" and board_has_chopped_tomato:
 				board_has_chopped_tomato = false
 				_set_held_item("Chopped tomato")
 				_start_put_animation()
 				_update_board_visual()
-				_feedback("You picked up the chopped tomato from the board.", Color("#61d39a"))
 				return
 			if held_item == "Empty hands" and board_has_tomato:
 				board_has_tomato = false
 				cutting_remaining = 2.0
 				_update_board_visual()
 				_update_cutting_animation()
-				_feedback("Chopping started! Stay beside the cutting board for two seconds.", Color("#f4ca67"))
 				return
 			if held_item != "Tomato":
-				_feedback("Bring a whole tomato here to chop it.", Color("#ef6b62"))
 				return
 			if cutting_remaining > 0.0:
-				_feedback("The tomato is being chopped. %.1f seconds left." % cutting_remaining, Color("#f4ca67"))
 				return
 			_set_held_item("Empty hands")
 			_start_put_animation()
 			cutting_remaining = 2.0
 			_update_cutting_animation()
-			_feedback("Chopping started! Wait two seconds.", Color("#f4ca67"))
 		"cook":
 			if held_item == "Plate" and soup_ready:
 				soup_ready = false
 				_set_held_item("Tomato soup")
 				_start_put_animation()
 				_update_pot_animation()
-				_feedback("You collected the soup. Take it to the serving window.", Color("#61d39a"))
-			elif held_item == "Plate" and cooking_remaining > 0.0:
-				_feedback("The soup is still cooking. %.1f seconds left." % cooking_remaining, Color("#f4ca67"))
 			elif held_item == "Chopped tomato":
 				if cooking_remaining > 0.0 or soup_ready:
-					_feedback("The pot is occupied. Wait until the soup is collected.", Color("#ef6b62"))
 					return
 				_set_held_item("Empty hands")
 				_start_put_animation()
 				cooking_remaining = 6.0
 				_update_pot_animation()
-				_feedback("Cooking started! Wait six seconds, then bring a plate.", Color("#f4ca67"))
-			else:
-				_feedback("Bring a chopped tomato to start cooking, or a plate when it is ready.", Color("#ef6b62"))
 		"plates":
 			if held_item == "Plate":
 				_set_held_item("Empty hands")
 				_start_put_animation()
-				_feedback("Plate returned to the plate counter.", Color("#61d39a"))
 				return
 			if held_item != "Empty hands":
-				_feedback("Your hands are full. Serve what you are carrying first.", Color("#ef6b62"))
 				return
 			_set_held_item("Plate")
 			_start_put_animation()
-			_feedback("You took a clean plate. Bring it to the pot when soup is ready.", Color("#61d39a"))
 		"serve":
 			if held_item == "Plate" and soup_ready:
-				_feedback("The soup is ready, but this plate is empty. Take it to the pot.", Color("#f4ca67"))
 				return
 			if held_item != "Tomato soup":
-				_feedback("Bring a plated tomato soup here first.", Color("#ef6b62"))
 				return
 			if orders.is_empty():
-				_feedback("No customers are waiting.", Color("#70c8ed"))
 				return
 			_set_held_item("Empty hands")
 			_start_put_animation()
@@ -521,7 +495,6 @@ func _interact(station_id: String) -> void:
 			var points := patience_points + combo * 25
 			score += points
 			combo += 1
-			_feedback("Perfect serve! +%d points  •  combo x%d" % [points, combo], Color("#61d39a"))
 			_spawn_order()
 	_update_hud()
 
@@ -538,7 +511,6 @@ func _spawn_order() -> void:
 func _tick() -> void:
 	if time_left <= 0:
 		timer.stop()
-		_feedback("SERVICE CLOSED  •  Final score: %d  •  Press R to restart" % score, Color("#f4ca67"))
 		return
 	time_left -= 1
 	if cutting_remaining > 0.0:
@@ -549,7 +521,6 @@ func _tick() -> void:
 			_update_cutting_animation()
 			_update_board_visual()
 			_set_held_item("Empty hands")
-			_feedback("Chopping cancelled: stay beside the cutting board.", Color("#ef6b62"))
 	if cooking_remaining > 0.0:
 		cooking_remaining = maxf(0.0, cooking_remaining - 1.0)
 		_update_pot_animation()
@@ -557,19 +528,16 @@ func _tick() -> void:
 			soup_ready = true
 			pot_animation.visible = true
 			pot_progress_label.text = "SOUP READY!"
-			_feedback("Ding! The tomato soup is ready. Bring a plate to the pot.", Color("#61d39a"))
 	if cutting_remaining > 0.0:
 		cutting_remaining = maxf(0.0, cutting_remaining - 1.0)
 		_update_cutting_animation()
 		if cutting_remaining == 0.0:
 			board_has_chopped_tomato = true
 			_update_board_visual()
-			_feedback("Chopping finished! Pick up the chopped tomato from the board.", Color("#61d39a"))
 	for order in orders:
 		order.patience = maxi(0, order.patience - 1)
 	if time_left % 30 == 0 and orders.size() < 2:
 		_spawn_order()
-		_feedback("A new family has entered the restaurant!", Color("#70c8ed"))
 	_update_hud()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -578,6 +546,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
+	add_child(canvas)
+	restart_label = _label("PRESS R TO RESTART", Color("#ffffff"), 20)
+	restart_label.position = Vector2(419, 638)
+	canvas.add_child(restart_label)
 	add_child(canvas)
 	score_label = _label("SCORE  0", Color("#f4ca67"), 20)
 	score_label.position = Vector2(42, 638)
@@ -606,6 +578,7 @@ func _label(text: String, color: Color, size: int) -> Label:
 func _update_hud() -> void:
 	if not orders_container:
 		return
+	restart_label.text = "PRESS R TO RESTART"
 	time_label.text = "TIME  %d:%02d" % [time_left / 60, time_left % 60]
 	score_label.text = "SCORE  %d" % score
 	var pot_status := "Pot: ready" if soup_ready else "Pot: cooking %.1fs" % cooking_remaining if cooking_remaining > 0.0 else "Pot: empty"
@@ -621,11 +594,6 @@ func _update_hud() -> void:
 		for order in orders:
 			orders_container.add_child(OrderCard.new(order))
 
-func _feedback(message: String, color: Color) -> void:
-	feedback = message
-	feedback_color = color
-	_update_hud()
-
 func _restart() -> void:
 	score = 0
 	combo = 0
@@ -638,7 +606,6 @@ func _restart() -> void:
 	orders.clear()
 	next_order_id = 1
 	_spawn_order()
-	_feedback("New 3D service started. Get cooking!", Color("#70c8ed"))
 	timer.start()
 	_set_held_item("Empty hands")
 	_start_put_animation()
