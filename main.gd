@@ -1,4 +1,4 @@
-extends Node3D
+extends Node3D # Inheritance of Node3D class
 
 class OrderCard extends Control:
 	var order_data: Dictionary
@@ -7,7 +7,7 @@ class OrderCard extends Control:
 		order_data = data
 		custom_minimum_size = Vector2(253, 132)
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-
+# HUD Graphics
 	func _draw() -> void:
 		var patience: int = order_data.get("patience", 0)
 		var card_color := Color("#fff3d0")
@@ -16,7 +16,6 @@ class OrderCard extends Control:
 
 		draw_rect(Rect2(10, 9, size.x - 20, 8), Color("#c7c5b8"))
 		draw_rect(Rect2(10, 9, (size.x - 20) * patience / 100.0, 8), Color("#61b879"))
-		draw_circle(Vector2(size.x - 15, 13), 3, Color("#ef6b62"))
 
 		draw_circle(Vector2(35, 54), 19, Color("#f1e4c4"))
 		draw_arc(Vector2(35, 54), 19, 0, TAU, 24, Color("#b7c8ce"), 2)
@@ -30,11 +29,10 @@ class OrderCard extends Control:
 		draw_string(ThemeDB.fallback_font, Vector2(74, 105), "T", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff3d0"))
 		draw_string(ThemeDB.fallback_font, Vector2(94, 105), "TOMATO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
 
-		draw_string(ThemeDB.fallback_font, Vector2(166, 101), "COOK AT", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#66737b"))
-		draw_rect(Rect2(166, 108, 24, 10), Color("#5d6872"))
-		draw_circle(Vector2(178, 107), 9, Color("#303d4a"))
-		draw_arc(Vector2(178, 107), 9, 0, TAU, 16, Color("#d5a74c"), 2)
-		draw_string(ThemeDB.fallback_font, Vector2(195, 115), "POT", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+		draw_rect(Rect2(166, 98, 24, 10), Color("#5d6872"))
+		draw_circle(Vector2(178, 97), 9, Color("#303d4a"))
+		draw_arc(Vector2(178, 97), 9, 0, TAU, 16, Color("#d5a74c"), 2)
+		draw_string(ThemeDB.fallback_font, Vector2(195, 105), "POT", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
 
 	func _panel_style(fill: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
 		var style := StyleBoxFlat.new()
@@ -44,7 +42,9 @@ class OrderCard extends Control:
 		style.set_corner_radius_all(radius)
 		return style
 
+# Room dimensions
 const FLOOR_SIZE := Vector3(20, 0.3, 13)
+# List of stations
 const STATION_NAMES := {
 	"crate": "TOMATO CRATE",
 	"cut": "CUTTING BOARD",
@@ -52,7 +52,7 @@ const STATION_NAMES := {
 	"plates": "PLATE COUNTER",
 	"serve": "SERVING WINDOW"
 }
-
+# Variables
 var chef: CharacterBody3D
 var chef_mesh: MeshInstance3D
 var nearest_station := ""
@@ -65,12 +65,21 @@ var soup_ready := false
 var score := 0
 var combo := 0
 var time_left := 120
+var is_paused := false
+var game_over := false
 var orders: Array[Dictionary] = []
 var next_order_id := 1
 var station_nodes: Dictionary = {}
 var restart_label: Label
 var time_label: Label
 var score_label: Label
+var pause_overlay: ColorRect
+var pause_title: Label
+var pause_hint: Label
+var final_overlay: ColorRect
+var final_title: Label
+var final_score_label: Label
+var final_restart_label: Label
 var order_label: RichTextLabel
 var orders_container: VBoxContainer
 var status_label: Label
@@ -90,8 +99,9 @@ var knife_visual: MeshInstance3D
 var walk_phase := 0.0
 var putting_remaining := 0.0
 var putting_total := 0.45
-
+# Functions call
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_setup_input()
 	_build_world()
 	_build_hud()
@@ -102,7 +112,7 @@ func _ready() -> void:
 	add_child(timer)
 	timer.start()
 	_update_hud()
-
+# Keybinds
 func _setup_input() -> void:
 	for action in ["move_up", "move_down", "move_left", "move_right", "interact"]:
 		if not InputMap.has_action(action):
@@ -116,12 +126,12 @@ func _setup_input() -> void:
 	_bind("move_right", KEY_D)
 	_bind("move_right", KEY_RIGHT)
 	_bind("interact", KEY_E)
-
+# Input
 func _bind(action: String, key: Key) -> void:
 	var event := InputEventKey.new()
 	event.physical_keycode = key
 	InputMap.action_add_event(action, event)
-
+# Environment
 func _build_world() -> void:
 	var environment := WorldEnvironment.new()
 	var env := Environment.new()
@@ -132,19 +142,19 @@ func _build_world() -> void:
 	env.ambient_light_energy = 0.55
 	environment.environment = env
 	add_child(environment)
-
+# Light
 	var light := DirectionalLight3D.new()
 	light.rotation_degrees = Vector3(-55, -25, 0)
 	light.light_color = Color("#ffe4b2")
 	light.light_energy = 1.25
 	light.shadow_enabled = true
 	add_child(light)
-
+# Room
 	_add_box("Floor", FLOOR_SIZE, Vector3(0, -0.15, 0), Color("#b99571"))
 	_add_box("BackWall", Vector3(20, 3.2, 0.3), Vector3(0, 1.45, -6.35), Color("#294052"))
 	_add_box("LeftWall", Vector3(0.3, 3.2, 13), Vector3(-10, 1.45, 0), Color("#294052"))
 	_add_box("RightWall", Vector3(0.3, 3.2, 13), Vector3(10, 1.45, 0), Color("#294052"))
-
+# Stations
 	var positions := {"crate": -7.0, "cut": -4.5, "cook": -1.5, "plates": 2.0, "serve": 6.0}
 	for station_id in positions:
 		var station_z := -4.4 if station_id != "plates" else -2.4
@@ -155,6 +165,7 @@ func _build_world() -> void:
 		if station_id == "cut":
 			_create_cutting_animation(station)
 
+# Character
 	chef = CharacterBody3D.new()
 	chef.name = "Chef"
 	chef.position = Vector3(0, 0.65, 2.5)
@@ -184,6 +195,7 @@ func _build_world() -> void:
 	held_visual = Node3D.new()
 	held_visual.position = Vector3(0.52, 0.15, -0.22)
 	chef.add_child(held_visual)
+# Tomato
 	tomato_visual = MeshInstance3D.new()
 	var tomato_mesh := SphereMesh.new()
 	tomato_mesh.radius = 0.16
@@ -191,6 +203,7 @@ func _build_world() -> void:
 	tomato_visual.mesh = tomato_mesh
 	tomato_visual.material_override = _material(Color("#ed514b"))
 	held_visual.add_child(tomato_visual)
+# Chooped Tomato (Anything)
 	chopped_visual = MeshInstance3D.new()
 	var chopped_mesh := BoxMesh.new()
 	chopped_mesh.size = Vector3(0.28, 0.08, 0.28)
@@ -198,6 +211,7 @@ func _build_world() -> void:
 	chopped_visual.material_override = _material(Color("#ed514b"))
 	chopped_visual.position.y = -0.1
 	held_visual.add_child(chopped_visual)
+# Plate
 	plate_visual = MeshInstance3D.new()
 	var plate_mesh := CylinderMesh.new()
 	plate_mesh.top_radius = 0.27
@@ -209,12 +223,13 @@ func _build_world() -> void:
 	held_visual.add_child(plate_visual)
 	_update_held_visual()
 
+# Camera
 	var camera := Camera3D.new()
 	camera.position = Vector3(0, 12, 13)
-	camera.rotation_degrees = Vector3(-39, 0, 0)
+	camera.rotation_degrees = Vector3(-40, 0, 0)
 	camera.current = true
 	add_child(camera)
-
+# Station blueprint
 func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = node_name
@@ -232,7 +247,7 @@ func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color)
 	body.add_child(collision)
 	add_child(body)
 	return body
-
+# Stations
 func _create_station(station_id: String, position: Vector3) -> StaticBody3D:
 	var station := _add_box(STATION_NAMES[station_id], Vector3(2.6, 1.5, 1.2), position, _station_color(station_id))
 	var sign := Label3D.new()
@@ -283,7 +298,7 @@ func _create_station(station_id: String, position: Vector3) -> StaticBody3D:
 		board_tomato_visual.visible = false
 		station.add_child(board_tomato_visual)
 	return station
-
+# Pot cooking animation
 func _create_pot_animation(station: StaticBody3D) -> void:
 	pot_animation = Node3D.new()
 	pot_animation.position = Vector3(0, 1.65, 0)
@@ -306,7 +321,7 @@ func _create_pot_animation(station: StaticBody3D) -> void:
 	pot_progress_label.outline_size = 8
 	pot_progress_label.outline_modulate = Color("#142235")
 	pot_animation.add_child(pot_progress_label)
-
+# Board cutting animation
 func _create_cutting_animation(station: StaticBody3D) -> void:
 	cutting_animation = Node3D.new()
 	cutting_animation.position = Vector3(0, 1.5, 0)
@@ -327,32 +342,41 @@ func _create_cutting_animation(station: StaticBody3D) -> void:
 	cutting_progress_label.outline_size = 8
 	cutting_progress_label.outline_modulate = Color("#142235")
 	cutting_animation.add_child(cutting_progress_label)
-
+# Pot cooking animation in process
 func _update_pot_animation() -> void:
 	if not pot_animation:
 		return
 	pot_animation.visible = cooking_remaining > 0.0
 	if cooking_remaining > 0.0:
 		pot_progress_label.text = "COOKING  %.1fs" % cooking_remaining
-
+# Board cutting animation in process
 func _update_cutting_animation() -> void:
 	if not cutting_animation:
 		return
 	cutting_animation.visible = cutting_remaining > 0.0
 	if cutting_remaining > 0.0:
 		cutting_progress_label.text = "CHOPPING  %.1fs" % cutting_remaining
-
+# List of color of stations
 func _station_color(station_id: String) -> Color:
-	return {"crate": Color("#bd7448"), "cut": Color("#bf5b50"), "cook": Color("#d47b46"), "plates": Color("#8b73b9"), "serve": Color("#d3a64b")}[station_id]
-
+	return {
+		"crate": Color("#bd7448"),
+		"cut": Color("#bf5b50"),
+		"cook": Color("#d47b46"),
+		"plates": Color("#8b73b9"),
+		"serve": Color("#d3a64b")
+	}[station_id]
+# Material blueprint
 func _material(color: Color) -> StandardMaterial3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = color
 	material.roughness = 0.78
 	return material
-
+# Physics
 func _physics_process(delta: float) -> void:
 	if not chef:
+		return
+	if is_paused or game_over:
+		chef.velocity = Vector3.ZERO
 		return
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	chef.velocity = Vector3(input.x, 0, input.y) * 4.8
@@ -364,7 +388,7 @@ func _physics_process(delta: float) -> void:
 	_update_nearest_station()
 	if Input.is_action_just_pressed("interact") and nearest_station != "":
 		_interact(nearest_station)
-
+# Walk animation
 func _update_walk_animation(input: Vector2, delta: float) -> void:
 	if input.length() > 0.05:
 		walk_phase += delta * 11.0
@@ -376,8 +400,9 @@ func _update_walk_animation(input: Vector2, delta: float) -> void:
 		chef_mesh.position.y = lerpf(chef_mesh.position.y, 0.0, delta * 12.0)
 		chef_mesh.rotation.z = lerpf(chef_mesh.rotation.z, 0.0, delta * 12.0)
 		held_visual.position.y = lerpf(held_visual.position.y, 0.15, delta * 12.0)
-
+# Action animations
 func _update_action_animation(delta: float) -> void:
+	# Cutting
 	if cutting_remaining > 0.0 and knife_visual:
 		var chop_wave := sin(Time.get_ticks_msec() * 0.018)
 		knife_visual.rotation.z = chop_wave * 0.55
@@ -385,6 +410,7 @@ func _update_action_animation(delta: float) -> void:
 	elif knife_visual:
 		knife_visual.rotation.z = 0.0
 		knife_visual.position.y = 0.2
+	# Putting
 	if putting_remaining > 0.0:
 		putting_remaining = maxf(0.0, putting_remaining - delta)
 		var progress := 1.0 - putting_remaining / putting_total
@@ -394,7 +420,7 @@ func _update_action_animation(delta: float) -> void:
 	else:
 		chef_mesh.rotation.x = lerpf(chef_mesh.rotation.x, 0.0, delta * 14.0)
 		held_visual.position.z = lerpf(held_visual.position.z, -0.22, delta * 14.0)
-
+# ?
 func _update_nearest_station() -> void:
 	var best := ""
 	var best_distance := 2.4
@@ -510,7 +536,7 @@ func _spawn_order() -> void:
 
 func _tick() -> void:
 	if time_left <= 0:
-		timer.stop()
+		_finish_game()
 		return
 	time_left -= 1
 	if cutting_remaining > 0.0:
@@ -536,37 +562,87 @@ func _tick() -> void:
 			_update_board_visual()
 	for order in orders:
 		order.patience = maxi(0, order.patience - 1)
+	if time_left == 0:
+		_finish_game()
+		_update_hud()
+		return
 	if time_left % 30 == 0 and orders.size() < 2:
 		_spawn_order()
 	_update_hud()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_R:
-		_restart()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R:
+			_restart()
+		elif event.keycode == KEY_ESCAPE:
+			if game_over:
+				return
+			if is_paused:
+				_unpause()
+			else:
+				_pause()
 
 func _build_hud() -> void:
 	var canvas := CanvasLayer.new()
+#	Restart
 	add_child(canvas)
 	restart_label = _label("PRESS R TO RESTART", Color("#ffffff"), 20)
 	restart_label.position = Vector2(419, 638)
 	canvas.add_child(restart_label)
-	add_child(canvas)
+#	Score
 	score_label = _label("SCORE  0", Color("#f4ca67"), 20)
 	score_label.position = Vector2(42, 638)
 	canvas.add_child(score_label)
+#	Time
 	time_label = _label("TIME  2:00", Color("#ef6b62"), 20)
 	time_label.position = Vector2(910, 638)
 	canvas.add_child(time_label)
-	var side := ColorRect.new()
-	side.color = Color("#142235e6")
-	side.position = Vector2(22, 18)
-	side.size = Vector2(275, 460)
-	canvas.add_child(side)
+#	Orders
 	orders_container = VBoxContainer.new()
 	orders_container.position = Vector2(33, 30)
 	orders_container.size = Vector2(253, 395)
 	orders_container.add_theme_constant_override("separation", 8)
 	canvas.add_child(orders_container)
+	pause_overlay = ColorRect.new()
+	pause_overlay.color = Color(0.03, 0.05, 0.09, 0.78)
+	pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.visible = false
+	canvas.add_child(pause_overlay)
+	pause_title = _label("Paused", Color("#fff3d0"), 48)
+	pause_title.position = Vector2(0, 270)
+	pause_title.size = Vector2(1100, 60)
+	pause_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_title.visible = false
+	canvas.add_child(pause_title)
+	pause_hint = _label("Press Esc to resume", Color("#b4c6cf"), 22)
+	pause_hint.position = Vector2(0, 338)
+	pause_hint.size = Vector2(1100, 40)
+	pause_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_hint.visible = false
+	canvas.add_child(pause_hint)
+	final_overlay = ColorRect.new()
+	final_overlay.color = Color(0.03, 0.05, 0.09, 0.86)
+	final_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	final_overlay.visible = false
+	canvas.add_child(final_overlay)
+	final_title = _label("Time's Up!", Color("#fff3d0"), 48)
+	final_title.position = Vector2(0, 245)
+	final_title.size = Vector2(1100, 60)
+	final_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	final_title.visible = false
+	canvas.add_child(final_title)
+	final_score_label = _label("Final Score: 0", Color("#f4ca67"), 30)
+	final_score_label.position = Vector2(0, 320)
+	final_score_label.size = Vector2(1100, 45)
+	final_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	final_score_label.visible = false
+	canvas.add_child(final_score_label)
+	final_restart_label = _label("Press R to restart", Color("#b4c6cf"), 20)
+	final_restart_label.position = Vector2(0, 380)
+	final_restart_label.size = Vector2(1100, 35)
+	final_restart_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	final_restart_label.visible = false
+	canvas.add_child(final_restart_label)
 
 func _label(text: String, color: Color, size: int) -> Label:
 	var label := Label.new()
@@ -595,9 +671,14 @@ func _update_hud() -> void:
 			orders_container.add_child(OrderCard.new(order))
 
 func _restart() -> void:
+	is_paused = false
+	game_over = false
+	get_tree().paused = false
 	score = 0
 	combo = 0
 	time_left = 120
+	chef.position = Vector3(0, 0.65, 2.5)
+	chef.velocity = Vector3.ZERO
 	cooking_remaining = 0.0
 	cutting_remaining = 0.0
 	board_has_tomato = false
@@ -612,6 +693,41 @@ func _restart() -> void:
 	_update_pot_animation()
 	_update_cutting_animation()
 	_update_board_visual()
+	pause_overlay.visible = false
+	pause_title.visible = false
+	pause_hint.visible = false
+	final_overlay.visible = false
+	final_title.visible = false
+	final_score_label.visible = false
+	final_restart_label.visible = false
+
+func _pause() -> void:
+	is_paused = true
+	get_tree().paused = true
+	timer.stop()
+	pause_overlay.visible = true
+	pause_title.visible = true
+	pause_hint.visible = true
+
+func _unpause() -> void:
+	is_paused = false
+	get_tree().paused = false
+	timer.start()
+	pause_overlay.visible = false
+	pause_title.visible = false
+	pause_hint.visible = false
+
+func _finish_game() -> void:
+	game_over = true
+	is_paused = false
+	chef.velocity = Vector3.ZERO
+	get_tree().paused = false
+	timer.stop()
+	final_score_label.text = "Final Score: %d" % score
+	final_overlay.visible = true
+	final_title.visible = true
+	final_score_label.visible = true
+	final_restart_label.visible = true
 
 func _set_held_item(item: String) -> void:
 	held_item = item
