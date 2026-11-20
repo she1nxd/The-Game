@@ -55,6 +55,10 @@ const STATION_NAMES := {
 # Variables
 var chef: CharacterBody3D
 var chef_mesh: Node3D
+var beaver_animation: AnimationPlayer
+var beaver_animation_name := ""
+var beaver_target_yaw := deg_to_rad(-90.0)
+var held_item_offset := Vector3(0.8, 0.25, 0.4)
 var nearest_station := ""
 var held_item := "Empty hands"
 var board_has_tomato := false
@@ -167,22 +171,17 @@ func _build_world() -> void:
 
 # Character
 	chef = CharacterBody3D.new()
-	chef.name = "Pug"
+	chef.name = "Beaver"
 	chef.position = Vector3(0, 0.65, 2.5)
 	add_child(chef)
-	var pug_scene := load("res://assets/pug/scene.gltf") as PackedScene
-	if pug_scene:
-		chef_mesh = pug_scene.instantiate()
-	else:
-		push_warning("Could not load pug model; using the fallback character mesh.")
-		chef_mesh = MeshInstance3D.new()
-		var fallback_mesh := chef_mesh as MeshInstance3D
-		var capsule := CapsuleMesh.new()
-		capsule.height = 1.45
-		capsule.radius = 0.38
-		fallback_mesh.mesh = capsule
-		fallback_mesh.material_override = _material(Color("#d95757"))
-	chef_mesh.scale = Vector3(0.8, 0.8, 0.8)
+	var beaver_scene := load("res://assets/beaver/scene.gltf") as PackedScene
+	if not beaver_scene:
+		push_error("Could not load the beaver model.")
+		return
+	chef_mesh = beaver_scene.instantiate()
+	chef_mesh.scale = Vector3(0.09, 0.09, 0.09)
+	chef_mesh.position.y = -0.65
+	chef_mesh.rotation_degrees.y = 90.0
 	chef.add_child(chef_mesh)
 	var chef_shape := CollisionShape3D.new()
 	var capsule_shape := CapsuleShape3D.new()
@@ -190,9 +189,24 @@ func _build_world() -> void:
 	capsule_shape.radius = 0.38
 	chef_shape.shape = capsule_shape
 	chef.add_child(chef_shape)
+	var animation_players := chef_mesh.find_children("*", "AnimationPlayer", true, false)
+	if not animation_players.is_empty():
+		beaver_animation = animation_players[0] as AnimationPlayer
 	held_visual = Node3D.new()
-	held_visual.position = Vector3(0.52, 0.15, -0.22)
-	chef.add_child(held_visual)
+	var skeletons := chef_mesh.find_children("*", "Skeleton3D", true, false)
+	if not skeletons.is_empty():
+		var skeleton := skeletons[0] as Skeleton3D
+		var right_wrist := BoneAttachment3D.new()
+		right_wrist.name = "RightHandAttachment"
+		var wrist_bone := skeleton.find_bone("Wrist_R_013")
+		if wrist_bone >= 0:
+			right_wrist.set_bone_idx(wrist_bone)
+		skeleton.add_child(right_wrist)
+		right_wrist.add_child(held_visual)
+		held_visual.position = held_item_offset
+	else:
+		held_visual.position = held_item_offset
+		chef.add_child(held_visual)
 # Tomato
 	tomato_visual = MeshInstance3D.new()
 	var tomato_mesh := SphereMesh.new()
@@ -200,6 +214,7 @@ func _build_world() -> void:
 	tomato_mesh.height = 0.32
 	tomato_visual.mesh = tomato_mesh
 	tomato_visual.material_override = _material(Color("#ed514b"))
+	tomato_visual.visible = false
 	held_visual.add_child(tomato_visual)
 # Chooped Tomato (Anything)
 	chopped_visual = MeshInstance3D.new()
@@ -208,6 +223,7 @@ func _build_world() -> void:
 	chopped_visual.mesh = chopped_mesh
 	chopped_visual.material_override = _material(Color("#ed514b"))
 	chopped_visual.position.y = -0.1
+	chopped_visual.visible = false
 	held_visual.add_child(chopped_visual)
 # Plate
 	plate_visual = MeshInstance3D.new()
@@ -217,6 +233,7 @@ func _build_world() -> void:
 	plate_mesh.height = 0.05
 	plate_visual.mesh = plate_mesh
 	plate_visual.material_override = _material(Color("#fff4d6"))
+	plate_visual.visible = false
 	plate_visual.position.y = -0.12
 	held_visual.add_child(plate_visual)
 	_update_held_visual()
@@ -387,17 +404,39 @@ func _physics_process(delta: float) -> void:
 	if Input.is_action_just_pressed("interact") and nearest_station != "":
 		_interact(nearest_station)
 # Walk animation
+func _play_beaver_animation(names: Array[String]) -> void:
+	if not beaver_animation:
+		return
+	for clip_name in names:
+		if beaver_animation.has_animation(clip_name):
+			if beaver_animation_name != clip_name:
+				beaver_animation_name = clip_name
+				var clip := beaver_animation.get_animation(clip_name)
+				if clip:
+					clip.loop_mode = Animation.LOOP_LINEAR
+				beaver_animation.play(clip_name)
+			return
 func _update_walk_animation(input: Vector2, delta: float) -> void:
 	if input.length() > 0.05:
 		walk_phase += delta * 11.0
+		beaver_target_yaw = deg_to_rad(-90.0) + atan2(input.x, input.y)
+		chef_mesh.rotation.y = lerp_angle(chef_mesh.rotation.y, beaver_target_yaw, delta * 10.0)
 		chef_mesh.position.y = abs(sin(walk_phase)) * 0.06
 		chef_mesh.rotation.z = sin(walk_phase) * 0.045
-		held_visual.position.y = 0.15 + abs(sin(walk_phase)) * 0.035
+		held_visual.position.y = held_item_offset.y + abs(sin(walk_phase)) * 0.035
+		if held_item == "Empty hands":
+			_play_beaver_animation(["Walk", "Idle_Walk"])
+		else:
+			_play_beaver_animation(["WalkCarry", "IdleCarry_Walk"])
 	else:
 		walk_phase = 0.0
 		chef_mesh.position.y = lerpf(chef_mesh.position.y, 0.0, delta * 12.0)
 		chef_mesh.rotation.z = lerpf(chef_mesh.rotation.z, 0.0, delta * 12.0)
-		held_visual.position.y = lerpf(held_visual.position.y, 0.15, delta * 12.0)
+		held_visual.position.y = lerpf(held_visual.position.y, held_item_offset.y, delta * 12.0)
+		if held_item == "Empty hands":
+			_play_beaver_animation(["Idle_Swim", "Idle_Walk"])
+		else:
+			_play_beaver_animation(["IdleCarry_Swim", "IdleCarry_Walk"])
 # Action animations
 func _update_action_animation(delta: float) -> void:
 	# Cutting
@@ -414,10 +453,10 @@ func _update_action_animation(delta: float) -> void:
 		var progress := 1.0 - putting_remaining / putting_total
 		var put_wave := sin(progress * PI)
 		chef_mesh.rotation.x = -put_wave * 0.28
-		held_visual.position.z = -0.22 - put_wave * 0.28
+		held_visual.position.z = held_item_offset.z - put_wave * 0.28
 	else:
 		chef_mesh.rotation.x = lerpf(chef_mesh.rotation.x, 0.0, delta * 14.0)
-		held_visual.position.z = lerpf(held_visual.position.z, -0.22, delta * 14.0)
+		held_visual.position.z = lerpf(held_visual.position.z, held_item_offset.z, delta * 14.0)
 # ?
 func _update_nearest_station() -> void:
 	var best := ""

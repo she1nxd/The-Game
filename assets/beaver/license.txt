@@ -1,0 +1,11 @@
+Model Information:
+* title:	Beaver Inc, Global Game Jam 2020
+* source:	https://sketchfab.com/3d-models/beaver-inc-global-game-jam-2020-4f9358a91d284c5ea66b3169a485bc9c
+* author:	Edriviel (https://sketchfab.com/edriviel)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Beaver Inc, Global Game Jam 2020" (https://sketchfab.com/3d-models/beaver-inc-global-game-jam-2020-4f9358a91d284c5ea66b3169a485bc9c) by Edriviel (https://sketchfab.com/edriviel) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

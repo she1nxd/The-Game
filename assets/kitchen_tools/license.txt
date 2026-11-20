@@ -1,0 +1,11 @@
+Model Information:
+* title:	Overcooked Kitchen Assets (Fan Art)
+* source:	https://sketchfab.com/3d-models/overcooked-kitchen-assets-fan-art-ec99c64c346347a89454f569054ddb86
+* author:	Arun Kumar S (https://sketchfab.com/arun-kumar)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Overcooked Kitchen Assets (Fan Art)" (https://sketchfab.com/3d-models/overcooked-kitchen-assets-fan-art-ec99c64c346347a89454f569054ddb86) by Arun Kumar S (https://sketchfab.com/arun-kumar) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
