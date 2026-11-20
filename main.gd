@@ -54,7 +54,7 @@ const STATION_NAMES := {
 }
 # Variables
 var chef: CharacterBody3D
-var chef_mesh: MeshInstance3D
+var chef_mesh: Node3D
 var nearest_station := ""
 var held_item := "Empty hands"
 var board_has_tomato := false
@@ -167,15 +167,22 @@ func _build_world() -> void:
 
 # Character
 	chef = CharacterBody3D.new()
-	chef.name = "Chef"
+	chef.name = "Pug"
 	chef.position = Vector3(0, 0.65, 2.5)
 	add_child(chef)
-	chef_mesh = MeshInstance3D.new()
-	var capsule := CapsuleMesh.new()
-	capsule.height = 1.45
-	capsule.radius = 0.38
-	chef_mesh.mesh = capsule
-	chef_mesh.material_override = _material(Color("#d95757"))
+	var pug_scene := load("res://assets/pug/scene.gltf") as PackedScene
+	if pug_scene:
+		chef_mesh = pug_scene.instantiate()
+	else:
+		push_warning("Could not load pug model; using the fallback character mesh.")
+		chef_mesh = MeshInstance3D.new()
+		var fallback_mesh := chef_mesh as MeshInstance3D
+		var capsule := CapsuleMesh.new()
+		capsule.height = 1.45
+		capsule.radius = 0.38
+		fallback_mesh.mesh = capsule
+		fallback_mesh.material_override = _material(Color("#d95757"))
+	chef_mesh.scale = Vector3(0.8, 0.8, 0.8)
 	chef.add_child(chef_mesh)
 	var chef_shape := CollisionShape3D.new()
 	var capsule_shape := CapsuleShape3D.new()
@@ -183,15 +190,6 @@ func _build_world() -> void:
 	capsule_shape.radius = 0.38
 	chef_shape.shape = capsule_shape
 	chef.add_child(chef_shape)
-	var hat := MeshInstance3D.new()
-	var hat_mesh := CylinderMesh.new()
-	hat_mesh.top_radius = 0.34
-	hat_mesh.bottom_radius = 0.44
-	hat_mesh.height = 0.28
-	hat.mesh = hat_mesh
-	hat.position.y = 0.82
-	hat.material_override = _material(Color("#fff4d6"))
-	chef.add_child(hat)
 	held_visual = Node3D.new()
 	held_visual.position = Vector3(0.52, 0.15, -0.22)
 	chef.add_child(held_visual)

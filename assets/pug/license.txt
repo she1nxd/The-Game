@@ -1,0 +1,11 @@
+Model Information:
+* title:	Overcooked! - Pug Character
+* source:	https://sketchfab.com/3d-models/overcooked-pug-character-564000f4aa2840e68fdeb339b8e7abce
+* author:	morepolys (https://sketchfab.com/morepolys)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Overcooked! - Pug Character" (https://sketchfab.com/3d-models/overcooked-pug-character-564000f4aa2840e68fdeb339b8e7abce) by morepolys (https://sketchfab.com/morepolys) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
