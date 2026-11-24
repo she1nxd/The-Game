@@ -60,7 +60,7 @@ const STATION_NAMES := {
 	"serve": "SERVING WINDOW"
 }
 
-# Definice vánočních receptů
+# Christmas recipes
 const RECIPES := {
 	"Rybí polévka": {
 		"ingredients": ["Fish", "Chopped carrot"],
@@ -266,6 +266,11 @@ func _build_world() -> void:
 			right_wrist.set_bone_idx(wrist_bone)
 		skeleton.add_child(right_wrist)
 		right_wrist.add_child(held_visual)
+		held_visual.scale = Vector3(
+			1.0 / chef_mesh.scale.x,
+			1.0 / chef_mesh.scale.y,
+			1.0 / chef_mesh.scale.z
+		)
 		held_visual.position = held_item_offset
 	else:
 		held_visual.position = held_item_offset
@@ -498,9 +503,9 @@ func _update_walk_animation(input: Vector2, delta: float) -> void:
 		chef_mesh.rotation.z = sin(walk_phase) * 0.045
 		held_visual.position.y = held_item_offset.y + abs(sin(walk_phase)) * 0.035
 		if held_item == "Empty hands":
-			_play_beaver_animation(["Walk", "Idle_Walk"])
+			_play_beaver_animation(["Idle_Walk"])
 		else:
-			_play_beaver_animation(["WalkCarry", "IdleCarry_Walk"])
+			_play_beaver_animation(["IdleCarry_Walk"])
 	else:
 		walk_phase = 0.0
 		chef_mesh.position.y = lerpf(chef_mesh.position.y, 0.0, delta * 12.0)
