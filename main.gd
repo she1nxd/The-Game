@@ -10,6 +10,10 @@ class OrderCard extends Control:
 # HUD Graphics
 	func _draw() -> void:
 		var patience: int = order_data.get("patience", 0)
+		var recipe_name: String = order_data.get("recipe", "Tomato Soup")
+		var ingredients: Array = order_data.get("ingredients", ["Tomato", "Plate"])
+		var station_name: String = order_data.get("station", "Stock Pot")
+		var dish_color: Color = _dish_color(order_data.get("color", "#ed514b"))
 		var card_color := Color("#fff3d0")
 		var border_color := Color("#d5b978")
 		draw_style_box(_panel_style(card_color, border_color, 8, 1), Rect2(Vector2.ZERO, size))
@@ -19,20 +23,24 @@ class OrderCard extends Control:
 
 		draw_circle(Vector2(35, 54), 19, Color("#f1e4c4"))
 		draw_arc(Vector2(35, 54), 19, 0, TAU, 24, Color("#b7c8ce"), 2)
-		draw_circle(Vector2(35, 53), 13, Color("#d95846"))
+		draw_circle(Vector2(35, 53), 13, dish_color)
 		draw_arc(Vector2(35, 53), 13, 0, PI, 16, Color("#f2c56b"), 2)
-		draw_string(ThemeDB.fallback_font, Vector2(21, 82), "SOUP", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+		draw_string(ThemeDB.fallback_font, Vector2(21, 82), "DISH", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
 
-		draw_string(ThemeDB.fallback_font, Vector2(64, 43), "TOMATO SOUP", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#26384a"))
+		draw_string(ThemeDB.fallback_font, Vector2(64, 43), recipe_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color("#26384a"))
 		draw_string(ThemeDB.fallback_font, Vector2(64, 78), "INGREDIENT", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#66737b"))
-		draw_circle(Vector2(78, 101), 10, Color("#ed514b"))
+		draw_circle(Vector2(78, 101), 10, dish_color)
 		draw_string(ThemeDB.fallback_font, Vector2(74, 105), "T", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#fff3d0"))
-		draw_string(ThemeDB.fallback_font, Vector2(94, 105), "TOMATO", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+		var ingredient_text := str(ingredients[0]).to_upper() if not ingredients.is_empty() else "TOMATO"
+		draw_string(ThemeDB.fallback_font, Vector2(94, 105), ingredient_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
 
 		draw_rect(Rect2(166, 98, 24, 10), Color("#5d6872"))
 		draw_circle(Vector2(178, 97), 9, Color("#303d4a"))
 		draw_arc(Vector2(178, 97), 9, 0, TAU, 16, Color("#d5a74c"), 2)
-		draw_string(ThemeDB.fallback_font, Vector2(195, 105), "POT", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+		draw_string(ThemeDB.fallback_font, Vector2(195, 105), station_name.to_upper().trim_prefix("STOCK "), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
+
+	func _dish_color(hex: String) -> Color:
+		return Color(hex)
 
 	func _panel_style(fill: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
 		var style := StyleBoxFlat.new()
@@ -52,6 +60,40 @@ const STATION_NAMES := {
 	"plates": "PLATE COUNTER",
 	"serve": "SERVING WINDOW"
 }
+const RECIPE_CATALOG := [
+	{
+		"name": "Tomato Soup",
+		"held_item": "Tomato soup",
+		"ingredients": ["Tomato", "Plate"],
+		"station": "Stock Pot",
+		"cooking_time": 6.0,
+		"color": "#ed514b"
+	},
+	{
+		"name": "Christmas Tomato Soup",
+		"held_item": "Christmas tomato soup",
+		"ingredients": ["Tomato", "Plate"],
+		"station": "Stock Pot",
+		"cooking_time": 7.0,
+		"color": "#6fa35a"
+	},
+	{
+		"name": "Festive Tomato Stew",
+		"held_item": "Festive tomato stew",
+		"ingredients": ["Tomato", "Plate"],
+		"station": "Stock Pot",
+		"cooking_time": 8.0,
+		"color": "#d95846"
+	},
+	{
+		"name": "Holiday Tomato Bisque",
+		"held_item": "Holiday tomato bisque",
+		"ingredients": ["Tomato", "Plate"],
+		"station": "Stock Pot",
+		"cooking_time": 9.0,
+		"color": "#d89b47"
+	}
+]
 # Variables
 var chef: CharacterBody3D
 var chef_mesh: Node3D
@@ -65,7 +107,8 @@ var board_has_tomato := false
 var board_has_chopped_tomato := false
 var cutting_remaining := 0.0
 var cooking_remaining := 0.0
-var soup_ready := false
+var cooking_recipe_name := ""
+var pot_ready_item := ""
 var score := 0
 var combo := 0
 var time_left := 120
@@ -522,17 +565,20 @@ func _interact(station_id: String) -> void:
 			cutting_remaining = 2.0
 			_update_cutting_animation()
 		"cook":
-			if held_item == "Plate" and soup_ready:
-				soup_ready = false
-				_set_held_item("Tomato soup")
+			if held_item == "Plate" and pot_ready_item != "":
+				var ready_item := pot_ready_item
+				pot_ready_item = ""
+				_set_held_item(ready_item)
 				_start_put_animation()
 				_update_pot_animation()
 			elif held_item == "Chopped tomato":
-				if cooking_remaining > 0.0 or soup_ready:
+				if cooking_remaining > 0.0 or pot_ready_item != "":
 					return
 				_set_held_item("Empty hands")
 				_start_put_animation()
-				cooking_remaining = 6.0
+				var recipe := _recipe_for_order()
+				cooking_recipe_name = recipe["name"]
+				cooking_remaining = float(recipe["cooking_time"])
 				_update_pot_animation()
 		"plates":
 			if held_item == "Plate":
@@ -544,11 +590,10 @@ func _interact(station_id: String) -> void:
 			_set_held_item("Plate")
 			_start_put_animation()
 		"serve":
-			if held_item == "Plate" and soup_ready:
-				return
-			if held_item != "Tomato soup":
-				return
 			if orders.is_empty():
+				return
+			var expected_item: String = str(orders[0].get("held_item", ""))
+			if held_item != expected_item:
 				return
 			_set_held_item("Empty hands")
 			_start_put_animation()
@@ -562,14 +607,30 @@ func _interact(station_id: String) -> void:
 	_update_hud()
 
 func _spawn_order() -> void:
-	orders.append({
+	var recipe: Dictionary
+	if next_order_id == 1:
+		recipe = RECIPE_CATALOG[0]
+	else:
+		recipe = RECIPE_CATALOG[randi() % RECIPE_CATALOG.size()]
+	var order := {
 		"id": next_order_id,
 		"patience": 100,
-		"recipe": "Tomato Soup",
-		"ingredients": ["Tomato", "Plate"],
-		"station": "Stock Pot"
-	})
+		"recipe": recipe["name"],
+		"held_item": recipe["held_item"],
+		"ingredients": recipe["ingredients"],
+		"station": recipe["station"],
+		"color": recipe["color"]
+	}
+	orders.append(order)
 	next_order_id += 1
+
+func _recipe_for_order() -> Dictionary:
+	if not orders.is_empty():
+		var order_name: String = str(orders[0].get("recipe", ""))
+		for recipe in RECIPE_CATALOG:
+			if recipe["name"] == order_name:
+				return recipe
+	return RECIPE_CATALOG[0]
 
 func _tick() -> void:
 	if time_left <= 0:
@@ -588,9 +649,14 @@ func _tick() -> void:
 		cooking_remaining = maxf(0.0, cooking_remaining - 1.0)
 		_update_pot_animation()
 		if cooking_remaining == 0.0:
-			soup_ready = true
+			var finished_recipe := RECIPE_CATALOG[0]
+			for recipe in RECIPE_CATALOG:
+				if recipe["name"] == cooking_recipe_name:
+					finished_recipe = recipe
+					break
+			pot_ready_item = str(finished_recipe["held_item"])
 			pot_animation.visible = true
-			pot_progress_label.text = "SOUP READY!"
+			pot_progress_label.text = str(finished_recipe["name"]).to_upper() + " READY!"
 	if cutting_remaining > 0.0:
 		cutting_remaining = maxf(0.0, cutting_remaining - 1.0)
 		_update_cutting_animation()
@@ -694,7 +760,7 @@ func _update_hud() -> void:
 	restart_label.text = "PRESS R TO RESTART"
 	time_label.text = "TIME  %d:%02d" % [time_left / 60, time_left % 60]
 	score_label.text = "SCORE  %d" % score
-	var pot_status := "Pot: ready" if soup_ready else "Pot: cooking %.1fs" % cooking_remaining if cooking_remaining > 0.0 else "Pot: empty"
+	var pot_status := "Pot: " + pot_ready_item if pot_ready_item != "" else "Pot: cooking %.1fs" % cooking_remaining if cooking_remaining > 0.0 else "Pot: empty"
 	if cutting_remaining > 0.0:
 		pot_status = "Board: chopping %.1fs" % cutting_remaining
 	var board_status := "Board: chopped tomato" if board_has_chopped_tomato else "Board: empty"
@@ -717,10 +783,11 @@ func _restart() -> void:
 	chef.position = Vector3(0, 0.65, 2.5)
 	chef.velocity = Vector3.ZERO
 	cooking_remaining = 0.0
+	cooking_recipe_name = ""
+	pot_ready_item = ""
 	cutting_remaining = 0.0
 	board_has_tomato = false
 	board_has_chopped_tomato = false
-	soup_ready = false
 	orders.clear()
 	next_order_id = 1
 	_spawn_order()
@@ -779,12 +846,20 @@ func _update_held_visual() -> void:
 		return
 	tomato_visual.visible = held_item == "Tomato"
 	chopped_visual.visible = held_item == "Chopped tomato"
-	plate_visual.visible = held_item == "Plate" or held_item == "Tomato soup"
-	if held_item == "Tomato soup":
+	var held_is_dish := false
+	for recipe in RECIPE_CATALOG:
+		if held_item == recipe["held_item"]:
+			held_is_dish = true
+			plate_visual.visible = true
+			tomato_visual.visible = true
+			tomato_visual.material_override = _material(Color(recipe["color"]))
+			break
+	plate_visual.visible = held_item == "Plate" or held_is_dish
+	if held_item == "Tomato":
+		tomato_visual.material_override = _material(Color("#ed514b"))
+	elif held_item == "Tomato soup":
 		tomato_visual.visible = true
 		tomato_visual.material_override = _material(Color("#e95c45"))
-	elif held_item == "Tomato":
-		tomato_visual.material_override = _material(Color("#ed514b"))
 
 func _update_board_visual() -> void:
 	if board_whole_tomato_visual:
