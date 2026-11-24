@@ -204,6 +204,7 @@ func _build_world() -> void:
 	_add_box("BackWall", Vector3(22, 3.2, 0.3), Vector3(0, 1.45, -6.35), Color("#294052"))
 	_add_box("LeftWall", Vector3(0.3, 3.2, 13), Vector3(-11, 1.45, 0), Color("#294052"))
 	_add_box("RightWall", Vector3(0.3, 3.2, 13), Vector3(11, 1.45, 0), Color("#294052"))
+	_add_kitchen_tools()
 
 	# Stanice rozmístěné podle počtu
 	var positions := {
@@ -313,7 +314,7 @@ func _build_world() -> void:
 	camera.current = true
 	add_child(camera)
 
-func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color) -> StaticBody3D:
+func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color, show_mesh: bool = true) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = node_name
 	body.position = position
@@ -322,6 +323,7 @@ func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color)
 	box.size = size
 	mesh.mesh = box
 	mesh.material_override = _material(color)
+	mesh.visible = show_mesh
 	body.add_child(mesh)
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
@@ -331,8 +333,35 @@ func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color)
 	add_child(body)
 	return body
 
+func _add_kitchen_tools() -> void:
+	var kitchen_scene := load("res://assets/kitchen_tools/scene.gltf") as PackedScene
+	if not kitchen_scene:
+		push_error("Could not load the kitchen tools model.")
+		return
+	var kitchen := kitchen_scene.instantiate() as Node3D
+	if not kitchen:
+		push_error("The kitchen tools scene has no Node3D root.")
+		return
+	kitchen.name = "KitchenTools"
+	kitchen.position = Vector3(0, 0, -4.4)
+	_hide_kitchen_floor(kitchen)
+	add_child(kitchen)
+
+func _hide_kitchen_floor(node: Node) -> void:
+	if node is MeshInstance3D:
+		var mesh_instance := node as MeshInstance3D
+		var is_floor := mesh_instance.name.begins_with("Object_2")
+		for surface in range(mesh_instance.mesh.get_surface_count()):
+			var material := mesh_instance.get_active_material(surface)
+			if material and material.resource_name.to_lower().contains("floor"):
+				is_floor = true
+		if is_floor:
+			mesh_instance.visible = false
+	for child in node.get_children():
+		_hide_kitchen_floor(child)
+
 func _create_station(station_id: String, position: Vector3) -> StaticBody3D:
-	var station := _add_box(STATION_NAMES[station_id], Vector3(1.8, 1.5, 1.2), position, _station_color(station_id))
+	var station := _add_box(STATION_NAMES[station_id], Vector3(1.8, 1.5, 1.2), position, _station_color(station_id), false)
 	var sign := Label3D.new()
 	sign.text = STATION_NAMES[station_id]
 	sign.position = Vector3(0, 1.35, 0)
