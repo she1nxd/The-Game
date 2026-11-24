@@ -866,3 +866,4 @@ func _update_board_visual() -> void:
 		board_whole_tomato_visual.visible = board_has_tomato
 	if board_tomato_visual:
 		board_tomato_visual.visible = board_has_chopped_tomato
+#recepty
