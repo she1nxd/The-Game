@@ -566,7 +566,7 @@ func _spawn_order() -> void:
 		"id": next_order_id,
 		"patience": 100,
 		"recipe": "Tomato Soup",
-		"ingredients": ["Tomato", "Salt", "Plate"],
+		"ingredients": ["Tomato", "Plate"],
 		"station": "Stock Pot"
 	})
 	next_order_id += 1
