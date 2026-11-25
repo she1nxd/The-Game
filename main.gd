@@ -12,6 +12,7 @@ class OrderCard extends Control:
 	func _draw() -> void:
 		var patience: int = order_data.get("patience", 0)
 		var recipe_name: String = order_data.get("recipe", "DISH")
+		var ingredients: Array = order_data.get("ingredients", [])
 		var recipe_color: Color = Color(order_data.get("color", "#ed514b"))
 		
 		var card_color := Color("#fff3d0")
@@ -28,7 +29,8 @@ class OrderCard extends Control:
 		draw_string(ThemeDB.fallback_font, Vector2(21, 82), "XMAS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#26384a"))
 
 		draw_string(ThemeDB.fallback_font, Vector2(64, 43), recipe_name.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#26384a"))
-		draw_string(ThemeDB.fallback_font, Vector2(64, 78), "ORDER", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#66737b"))
+		draw_string(ThemeDB.fallback_font, Vector2(64, 61), "INGREDIENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#66737b"))
+		draw_string(ThemeDB.fallback_font, Vector2(64, 75), ", ".join(PackedStringArray(ingredients)), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#26384a"))
 		
 		draw_rect(Rect2(166, 98, 24, 10), Color("#5d6872"))
 		draw_circle(Vector2(178, 97), 9, Color("#303d4a"))
@@ -43,43 +45,60 @@ class OrderCard extends Control:
 		style.set_corner_radius_all(radius)
 		return style
 
-# Room dimensions
-const FLOOR_SIZE := Vector3(22, 0.3, 13)
-
 # List of stations
 const STATION_NAMES := {
 	"fish_crate": "FISH CRATE",
-	"carrot_crate": "CARROT CRATE",
 	"potato_crate": "POTATO CRATE",
 	"dough_crate": "DOUGH CRATE",
 	"mayo_crate": "MAYO CRATE",
+	"sugar_crate": "SUGAR CRATE",
 	"cut": "CUTTING BOARD",
 	"cook": "STOCK POT",
 	"oven": "OVEN",
+	"mixer": "MIXER",
+	"pan": "COOKING PAN",
 	"plates": "PLATE COUNTER",
-	"serve": "SERVING WINDOW"
+	"serve": "SERVING WINDOW",
+	"trash": "TRASH CAN"
+}
+
+const INGREDIENT_STATIONS := {
+	"fish_crate": "Fish",
+	"potato_crate": "Potato",
+	"dough_crate": "Dough",
+	"mayo_crate": "Mayonnaise",
+	"sugar_crate": "Sugar"
+}
+
+const PREPARATIONS := {
+	"Boil potatoes": {
+		"ingredients": ["Potato"],
+		"station": "cook",
+		"prep_time": 10.0,
+		"result_item": "Boiled potato"
+	}
 }
 
 # Christmas recipes
 const RECIPES := {
 	"Rybí polévka": {
-		"ingredients": ["Fish", "Chopped carrot"],
+		"ingredients": ["Chopped fish"],
 		"station": "cook",
 		"prep_time": 7.0,
 		"result_item": "Fish soup",
 		"color": "#3b6ba5"
 	},
 	"Bramborový salát": {
-		"ingredients": ["Chopped potato", "Mayonnaise"],
-		"station": "cut",
-		"prep_time": 4.0,
+		"ingredients": ["Boiled potato", "Mayonnaise"],
+		"station": "mixer",
+		"prep_time": 0.0,
 		"result_item": "Potato salad",
 		"color": "#f2c56b"
 	},
 	"Vánoční cukroví": {
-		"ingredients": ["Dough"],
+		"ingredients": ["Dough", "Sugar"],
 		"station": "oven",
-		"prep_time": 5.0,
+		"prep_time": 15.0,
 		"result_item": "Cookies",
 		"color": "#d5a74c"
 	}
@@ -94,18 +113,17 @@ var beaver_target_yaw := deg_to_rad(-90.0)
 var held_item_offset := Vector3(0.8, 0.25, 0.4)
 var nearest_station := ""
 var held_item := "Empty hands"
+var held_item_on_plate := false
 
 var board_has_item := false
 var board_has_chopped_item := false
 var current_board_ingredient := ""
 
 var cutting_remaining := 0.0
-var cooking_remaining := 0.0
-var baking_remaining := 0.0
-
-var dish_ready := false
-var oven_ready := false
-var current_cooking_recipe := ""
+var station_ingredients: Dictionary = {}
+var station_remaining: Dictionary = {}
+var ready_dishes: Dictionary = {}
+var active_recipes: Dictionary = {}
 
 var score := 0
 var combo := 0
@@ -115,6 +133,7 @@ var game_over := false
 var orders: Array[Dictionary] = []
 var next_order_id := 1
 var station_nodes: Dictionary = {}
+var board_food_visual: Node3D
 
 var restart_label: Label
 var time_label: Label
@@ -137,10 +156,14 @@ var pot_animation: Node3D
 var pot_progress_label: Label3D
 var oven_animation: Node3D
 var oven_progress_label: Label3D
+var mixer_animation: Node3D
+var mixer_progress_label: Label3D
+var pan_animation: Node3D
+var pan_progress_label: Label3D
+var prep_animations: Dictionary = {}
+var prep_progress_labels: Dictionary = {}
 var cutting_animation: Node3D
 var cutting_progress_label: Label3D
-var board_chopped_visual: MeshInstance3D
-var board_whole_visual: MeshInstance3D
 var knife_visual: MeshInstance3D
 
 var walk_phase := 0.0
@@ -200,40 +223,38 @@ func _build_world() -> void:
 	light.shadow_enabled = true
 	add_child(light)
 
-	_add_box("Floor", FLOOR_SIZE, Vector3(0, -0.15, 0), Color("#b99571"))
+	_add_box("Floor", Vector3(22, 0.3, 13), Vector3(0, -0.15, 0), Color("#b99571"))
 	_add_box("BackWall", Vector3(22, 3.2, 0.3), Vector3(0, 1.45, -6.35), Color("#294052"))
 	_add_box("LeftWall", Vector3(0.3, 3.2, 13), Vector3(-11, 1.45, 0), Color("#294052"))
-	_add_box("RightWall", Vector3(0.3, 3.2, 13), Vector3(11, 1.45, 0), Color("#294052"))
-	_add_kitchen_tools()
 
-	# Stanice rozmístěné podle počtu
-	var positions := {
-		"fish_crate": -9.0,
-		"carrot_crate": -7.0,
-		"potato_crate": -5.0,
-		"dough_crate": -3.0,
-		"mayo_crate": -1.0,
-		"cut": 1.0,
-		"cook": 3.0,
-		"oven": 5.0,
-		"plates": 7.0,
-		"serve": 9.0
-	}
-	for station_id in positions:
-		var station_z := -4.4 if station_id != "plates" else -2.4
-		var station := _create_station(station_id, Vector3(positions[station_id], 0.8, station_z))
+	var ingredient_ids: Array = INGREDIENT_STATIONS.keys()
+	for index in range(ingredient_ids.size()):
+		var station_id: String = ingredient_ids[index]
+		var station_position := Vector3(-5 * (ingredient_ids.size() - 1) / 2.0 + index * 2.4, 0.8, -4.5)
+		var station := _create_station(station_id, station_position)
 		station_nodes[station_id] = station
-		if station_id == "cook":
-			_create_pot_animation(station)
-		if station_id == "oven":
-			_create_oven_animation(station)
-		if station_id == "cut":
-			_create_cutting_animation(station)
+
+	var tool_ids := ["cut", "cook", "oven", "mixer", "pan", "plates", "serve", "trash"]
+	for index in range(tool_ids.size()):
+		var station_id: String = tool_ids[index]
+		var station := _create_station(station_id, Vector3(-2.4 * (tool_ids.size() - 1) / 2.0 + index * 2.4, 0.8, 1.2))
+		station_nodes[station_id] = station
+		match station_id:
+			"cook":
+				_create_pot_animation(station)
+			"oven":
+				_create_oven_animation(station)
+			"mixer":
+				_create_mixer_animation(station)
+			"pan":
+				_create_pan_animation(station)
+			"cut":
+				_create_cutting_animation(station)
 
 # Character
 	chef = CharacterBody3D.new()
 	chef.name = "Beaver"
-	chef.position = Vector3(0, 0.65, 2.5)
+	chef.position = Vector3.ZERO
 	add_child(chef)
 	var beaver_scene := load("res://assets/beaver/scene.gltf") as PackedScene
 	if not beaver_scene:
@@ -333,75 +354,213 @@ func _add_box(node_name: String, size: Vector3, position: Vector3, color: Color,
 	add_child(body)
 	return body
 
-func _add_kitchen_tools() -> void:
-	var kitchen_scene := load("res://assets/kitchen_tools/scene.gltf") as PackedScene
-	if not kitchen_scene:
-		push_error("Could not load the kitchen tools model.")
-		return
-	var kitchen := kitchen_scene.instantiate() as Node3D
-	if not kitchen:
-		push_error("The kitchen tools scene has no Node3D root.")
-		return
-	kitchen.name = "KitchenTools"
-	kitchen.position = Vector3(0, 0, -4.4)
-	_hide_kitchen_floor(kitchen)
-	add_child(kitchen)
-
-func _hide_kitchen_floor(node: Node) -> void:
-	if node is MeshInstance3D:
-		var mesh_instance := node as MeshInstance3D
-		var is_floor := mesh_instance.name.begins_with("Object_2")
-		for surface in range(mesh_instance.mesh.get_surface_count()):
-			var material := mesh_instance.get_active_material(surface)
-			if material and material.resource_name.to_lower().contains("floor"):
-				is_floor = true
-		if is_floor:
-			mesh_instance.visible = false
-	for child in node.get_children():
-		_hide_kitchen_floor(child)
-
 func _create_station(station_id: String, position: Vector3) -> StaticBody3D:
 	var station := _add_box(STATION_NAMES[station_id], Vector3(1.8, 1.5, 1.2), position, _station_color(station_id), false)
 	var sign := Label3D.new()
 	sign.text = STATION_NAMES[station_id]
-	sign.position = Vector3(0, 1.35, 0)
-	sign.font_size = 24
+	sign.position = Vector3(0, 1.45, 0)
+	sign.font_size =  48
 	sign.modulate = Color("#fff3d0")
 	sign.outline_size = 8
 	sign.outline_modulate = Color("#142235")
 	station.add_child(sign)
-	
-	if station_id == "plates":
-		for index in range(3):
-			var plate := MeshInstance3D.new()
-			var plate_mesh := CylinderMesh.new()
-			plate_mesh.top_radius = 0.38
-			plate_mesh.bottom_radius = 0.38
-			plate_mesh.height = 0.06
-			plate.mesh = plate_mesh
-			plate.position = Vector3(0, 0.82 + index * 0.08, 0)
-			plate.material_override = _material(Color("#fff4d6"))
-			station.add_child(plate)
-
-	if station_id == "cut":
-		board_whole_visual = MeshInstance3D.new()
-		var whole_mesh := SphereMesh.new()
-		whole_mesh.radius = 0.16
-		whole_mesh.height = 0.32
-		board_whole_visual.mesh = whole_mesh
-		board_whole_visual.position = Vector3(0, 0.98, 0)
-		board_whole_visual.visible = false
-		station.add_child(board_whole_visual)
-
-		board_chopped_visual = MeshInstance3D.new()
-		var chopped_mesh := BoxMesh.new()
-		chopped_mesh.size = Vector3(0.28, 0.08, 0.28)
-		board_chopped_visual.mesh = chopped_mesh
-		board_chopped_visual.position = Vector3(0, 0.82, 0)
-		board_chopped_visual.visible = false
-		station.add_child(board_chopped_visual)
-		
+	if INGREDIENT_STATIONS.has(station_id):
+		_create_crate_model(station, station_id)
+	else:
+		_create_station_model(station, station_id)
 	return station
+
+func _create_crate_model(station: StaticBody3D, station_id: String) -> void:
+	var crate_body := BoxMesh.new()
+	var crate_position := Vector3(0, -0.35, 0)
+	if station_id == "serve":
+		crate_body.size = Vector3(1.8, 0.9, 1.05)
+		crate_position.y = -0.25
+	else:
+		crate_body.size = Vector3(1.05, 0.7, 1.05)
+	_add_station_mesh(station, crate_body, crate_position, Color("#8a5939"))
+
+	for index in range(2):
+		var slat := BoxMesh.new()
+		slat.size = Vector3(crate_body.size.x + 0.02, 0.1, 0.05)
+		var slat_y := -0.52 + index * 0.22 if station_id != "serve" else -0.52 + index * 0.3
+		_add_station_mesh(station, slat, Vector3(0, slat_y, crate_body.size.z / 2.0 + 0.025), Color("#b17a50"))
+
+func _create_station_model(station: StaticBody3D, station_id: String) -> void:
+	match station_id:
+		"cut":
+			_create_cutting_board_model(station)
+		"cook":
+			_create_stock_pot_station_model(station)
+		"oven":
+			_create_oven_station_model(station)
+		"mixer":
+			_create_mixer_station_model(station)
+		"pan":
+			_create_pan_station_model(station)
+		"plates":
+			_create_plate_station_model(station)
+		"serve":
+			_create_serving_window_model(station)
+		"trash":
+			_create_trash_can_model(station)
+
+func _create_cutting_board_model(station: StaticBody3D) -> void:
+	_create_counter_model(station, Color("#80533b"))
+	var board := BoxMesh.new()
+	board.size = Vector3(1.35, 0.12, 0.86)
+	_add_station_mesh(station, board, Vector3(0, 0.3, 0), Color("#d2a36b"))
+	var groove := BoxMesh.new()
+	groove.size = Vector3(1.08, 0.02, 0.035)
+	_add_station_mesh(station, groove, Vector3(0, 0.367, 0.32), Color("#9b704d"))
+	var fish := SphereMesh.new()
+	var fish_visual := _add_station_mesh(station, fish, Vector3(0, 0.4, 0), Color("#3b6ba5"))
+	fish_visual.scale = Vector3(0.34, 0.12, 0.13)
+	fish_visual.visible = false
+	board_food_visual = fish_visual
+
+func _create_stock_pot_station_model(station: StaticBody3D) -> void:
+	_create_counter_model(station, Color("#303d4a"))
+	var cooktop := BoxMesh.new()
+	cooktop.size = Vector3(1.65, 0.12, 1.05)
+	_add_station_mesh(station, cooktop, Vector3(0, 0.31, 0), Color("#647487"))
+	for x in [-0.42, 0.42]:
+		for z in [-0.25, 0.25]:
+			var burner := CylinderMesh.new()
+			burner.top_radius = 0.22
+			burner.bottom_radius = 0.22
+			burner.height = 0.055
+			_add_station_mesh(station, burner, Vector3(x, 0.4, z), Color("#222c38"))
+	var pot := CylinderMesh.new()
+	pot.top_radius = 0.34
+	pot.bottom_radius = 0.29
+	pot.height = 0.42
+	_add_station_mesh(station, pot, Vector3(0, 0.67, 0), Color("#8c9ba5"))
+	var lid := CylinderMesh.new()
+	lid.top_radius = 0.36
+	lid.bottom_radius = 0.36
+	lid.height = 0.06
+	_add_station_mesh(station, lid, Vector3(0, 0.91, 0), Color("#dbe7ee"))
+	for x in [-0.4, 0.4]:
+		var handle := BoxMesh.new()
+		handle.size = Vector3(0.18, 0.07, 0.1)
+		_add_station_mesh(station, handle, Vector3(x, 0.68, 0), Color("#303d4a"))
+
+func _create_oven_station_model(station: StaticBody3D) -> void:
+	_create_counter_model(station, Color("#80533b"))
+	var body := BoxMesh.new()
+	body.size = Vector3(1.45, 1.15, 1.0)
+	_add_station_mesh(station, body, Vector3(0, -0.02, 0), Color("#667687"))
+	var door := BoxMesh.new()
+	door.size = Vector3(1.14, 0.57, 0.08)
+	_add_station_mesh(station, door, Vector3(0, -0.16, 0.54), Color("#26384a"))
+	var glass := BoxMesh.new()
+	glass.size = Vector3(0.88, 0.32, 0.025)
+	_add_station_mesh(station, glass, Vector3(0, -0.16, 0.595), Color("#7eb2c2"))
+	for x in [-0.4, 0.0, 0.4]:
+		var knob := SphereMesh.new()
+		var knob_visual := _add_station_mesh(station, knob, Vector3(x, 0.54, 0.55), Color("#f0c66b"))
+		knob_visual.scale = Vector3.ONE * 0.09
+
+func _create_mixer_station_model(station: StaticBody3D) -> void:
+	_create_counter_model(station, Color("#80533b"))
+	var base := BoxMesh.new()
+	base.size = Vector3(0.68, 0.2, 0.52)
+	_add_station_mesh(station, base, Vector3(0, 0.32, 0), Color("#71a7a5"))
+	var arm := BoxMesh.new()
+	arm.size = Vector3(0.18, 0.58, 0.2)
+	_add_station_mesh(station, arm, Vector3(0.22, 0.65, -0.1), Color("#71a7a5"))
+	var head := BoxMesh.new()
+	head.size = Vector3(0.62, 0.2, 0.32)
+	_add_station_mesh(station, head, Vector3(-0.02, 0.9, -0.08), Color("#82b8b3"))
+	var bowl := CylinderMesh.new()
+	bowl.top_radius = 0.34
+	bowl.bottom_radius = 0.25
+	bowl.height = 0.38
+	_add_station_mesh(station, bowl, Vector3(-0.02, 0.59, 0.18), Color("#dbe7ee"))
+	var whisk := BoxMesh.new()
+	whisk.size = Vector3(0.035, 0.32, 0.035)
+	_add_station_mesh(station, whisk, Vector3(-0.02, 0.65, 0.18), Color("#596c80"))
+
+func _create_pan_station_model(station: StaticBody3D) -> void:
+	_create_counter_model(station, Color("#80533b"))
+	var pan := CylinderMesh.new()
+	pan.top_radius = 0.42
+	pan.bottom_radius = 0.36
+	pan.height = 0.12
+	_add_station_mesh(station, pan, Vector3(-0.1, 0.36, 0), Color("#303d4a"))
+	var handle := BoxMesh.new()
+	handle.size = Vector3(0.65, 0.08, 0.12)
+	_add_station_mesh(station, handle, Vector3(0.45, 0.39, 0), Color("#8b684d"))
+	var flame := CylinderMesh.new()
+	flame.top_radius = 0.2
+	flame.bottom_radius = 0.2
+	flame.height = 0.05
+	_add_station_mesh(station, flame, Vector3(-0.1, 0.26, 0), Color("#d5a74c"))
+
+func _create_plate_station_model(station: StaticBody3D) -> void:
+	_create_counter_model(station, Color("#80533b"))
+	for index in range(4):
+		var plate := CylinderMesh.new()
+		plate.top_radius = 0.48 - index * 0.04
+		plate.bottom_radius = 0.45 - index * 0.04
+		plate.height = 0.07
+		_add_station_mesh(station, plate, Vector3(0, 0.34 + index * 0.065, 0), Color("#fff3d0"))
+
+func _create_serving_window_model(station: StaticBody3D) -> void:
+	var counter := BoxMesh.new()
+	counter.size = Vector3(1.9, 0.82, 1.05)
+	_add_station_mesh(station, counter, Vector3(0, -0.26, 0.08), Color("#8a5939"))
+	var top := BoxMesh.new()
+	top.size = Vector3(2.0, 0.16, 1.18)
+	_add_station_mesh(station, top, Vector3(0, 0.23, 0.08), Color("#d5a74c"))
+	for x in [-0.92, 0.92]:
+		var post := BoxMesh.new()
+		post.size = Vector3(0.14, 1.45, 0.14)
+		_add_station_mesh(station, post, Vector3(x, 0.72, -0.42), Color("#80533b"))
+	var canopy := BoxMesh.new()
+	canopy.size = Vector3(2.0, 0.16, 0.2)
+	_add_station_mesh(station, canopy, Vector3(0, 1.45, -0.42), Color("#d5a74c"))
+	var opening := BoxMesh.new()
+	opening.size = Vector3(1.45, 0.68, 0.04)
+	_add_station_mesh(station, opening, Vector3(0, 0.98, -0.3), Color("#26384a"))
+
+func _create_trash_can_model(station: StaticBody3D) -> void:
+	var bin := CylinderMesh.new()
+	bin.top_radius = 0.42
+	bin.bottom_radius = 0.34
+	bin.height = 0.82
+	_add_station_mesh(station, bin, Vector3(0, -0.3, 0), Color("#596c80"))
+	var rim := CylinderMesh.new()
+	rim.top_radius = 0.44
+	rim.bottom_radius = 0.44
+	rim.height = 0.08
+	_add_station_mesh(station, rim, Vector3(0, 0.15, 0), Color("#303d4a"))
+	var lid := CylinderMesh.new()
+	lid.top_radius = 0.46
+	lid.bottom_radius = 0.46
+	lid.height = 0.07
+	_add_station_mesh(station, lid, Vector3(0, 0.22, 0), Color("#303d4a"))
+
+func _create_counter_model(station: StaticBody3D, color: Color) -> void:
+	var cabinet := BoxMesh.new()
+	cabinet.size = Vector3(1.58, 0.78, 0.98)
+	_add_station_mesh(station, cabinet, Vector3(0, -0.3, 0), color)
+	var countertop := BoxMesh.new()
+	countertop.size = Vector3(1.78, 0.16, 1.15)
+	_add_station_mesh(station, countertop, Vector3(0, 0.17, 0), color.lightened(0.2))
+	for x in [-0.5, 0.0, 0.5]:
+		var pull := BoxMesh.new()
+		pull.size = Vector3(0.2, 0.035, 0.03)
+		_add_station_mesh(station, pull, Vector3(x, -0.18, 0.51), Color("#d5b978"))
+
+func _add_station_mesh(station: StaticBody3D, mesh: Mesh, position: Vector3, color: Color) -> MeshInstance3D:
+	var visual := MeshInstance3D.new()
+	visual.mesh = mesh
+	visual.position = position
+	visual.material_override = _material(color)
+	station.add_child(visual)
+	return visual
 
 func _create_pot_animation(station: StaticBody3D) -> void:
 	pot_animation = Node3D.new()
@@ -416,6 +575,8 @@ func _create_pot_animation(station: StaticBody3D) -> void:
 	pot_progress_label.outline_size = 8
 	pot_progress_label.outline_modulate = Color("#142235")
 	pot_animation.add_child(pot_progress_label)
+	prep_animations["cook"] = pot_animation
+	prep_progress_labels["cook"] = pot_progress_label
 
 func _create_oven_animation(station: StaticBody3D) -> void:
 	oven_animation = Node3D.new()
@@ -430,6 +591,35 @@ func _create_oven_animation(station: StaticBody3D) -> void:
 	oven_progress_label.outline_size = 8
 	oven_progress_label.outline_modulate = Color("#142235")
 	oven_animation.add_child(oven_progress_label)
+	prep_animations["oven"] = oven_animation
+	prep_progress_labels["oven"] = oven_progress_label
+
+func _create_mixer_animation(station: StaticBody3D) -> void:
+	mixer_animation = _create_extra_prep_animation(station, "MIXING...")
+	mixer_progress_label = mixer_animation.get_child(0) as Label3D
+	prep_animations["mixer"] = mixer_animation
+	prep_progress_labels["mixer"] = mixer_progress_label
+
+func _create_pan_animation(station: StaticBody3D) -> void:
+	pan_animation = _create_extra_prep_animation(station, "FRYING...")
+	pan_progress_label = pan_animation.get_child(0) as Label3D
+	prep_animations["pan"] = pan_animation
+	prep_progress_labels["pan"] = pan_progress_label
+
+func _create_extra_prep_animation(station: StaticBody3D, status_text: String) -> Node3D:
+	var animation := Node3D.new()
+	animation.position = Vector3(0, 1.65, 0)
+	animation.visible = false
+	station.add_child(animation)
+	var progress_label := Label3D.new()
+	progress_label.text = status_text
+	progress_label.position = Vector3(0, 0.65, 0)
+	progress_label.font_size = 24
+	progress_label.modulate = Color("#f4ca67")
+	progress_label.outline_size = 8
+	progress_label.outline_modulate = Color("#142235")
+	animation.add_child(progress_label)
+	return animation
 
 func _create_cutting_animation(station: StaticBody3D) -> void:
 	cutting_animation = Node3D.new()
@@ -453,18 +643,28 @@ func _create_cutting_animation(station: StaticBody3D) -> void:
 	cutting_animation.add_child(cutting_progress_label)
 
 func _update_pot_animation() -> void:
-	if not pot_animation:
-		return
-	pot_animation.visible = cooking_remaining > 0.0 or dish_ready
-	if cooking_remaining > 0.0:
-		pot_progress_label.text = "COOKING %.1fs" % cooking_remaining
+	_update_prep_animation("cook")
 
 func _update_oven_animation() -> void:
-	if not oven_animation:
+	_update_prep_animation("oven")
+
+func _update_prep_animation(station_id: String) -> void:
+	if not prep_animations.has(station_id):
 		return
-	oven_animation.visible = baking_remaining > 0.0 or oven_ready
-	if baking_remaining > 0.0:
-		oven_progress_label.text = "BAKING %.1fs" % baking_remaining
+	var animation: Node3D = prep_animations[station_id]
+	var progress_label: Label3D = prep_progress_labels[station_id]
+	var remaining: float = station_remaining.get(station_id, 0.0)
+	animation.visible = remaining > 0.0 or ready_dishes.has(station_id)
+	if ready_dishes.has(station_id):
+		progress_label.text = "READY!"
+	elif remaining > 0.0:
+		var status: String = {
+			"cook": "COOKING",
+			"oven": "BAKING",
+			"mixer": "MIXING",
+			"pan": "FRYING"
+		}[station_id]
+		progress_label.text = "%s %.1fs" % [status, remaining]
 
 func _update_cutting_animation() -> void:
 	if not cutting_animation:
@@ -476,15 +676,18 @@ func _update_cutting_animation() -> void:
 func _station_color(station_id: String) -> Color:
 	return {
 		"fish_crate": Color("#3b6ba5"),
-		"carrot_crate": Color("#e67e22"),
 		"potato_crate": Color("#c49142"),
 		"dough_crate": Color("#dfc086"),
 		"mayo_crate": Color("#e0e0e0"),
+		"sugar_crate": Color("#f4f0e5"),
 		"cut": Color("#bf5b50"),
 		"cook": Color("#d47b46"),
 		"oven": Color("#8c5643"),
+		"mixer": Color("#71a7a5"),
+		"pan": Color("#596c80"),
 		"plates": Color("#8b73b9"),
-		"serve": Color("#d3a64b")
+		"serve": Color("#d3a64b"),
+		"trash": Color("#596c80")
 	}[station_id]
 
 func _material(color: Color) -> StandardMaterial3D:
@@ -505,7 +708,7 @@ func _physics_process(delta: float) -> void:
 	_update_walk_animation(input, delta)
 	_update_action_animation(delta)
 	chef.position.x = clamp(chef.position.x, -10.0, 10.0)
-	chef.position.z = clamp(chef.position.z, -2.4, 5.4)
+	chef.position.z = clamp(chef.position.z, -4.5, 6.2)
 	_update_nearest_station()
 	if Input.is_action_just_pressed("interact") and nearest_station != "":
 		_interact(nearest_station)
@@ -532,18 +735,18 @@ func _update_walk_animation(input: Vector2, delta: float) -> void:
 		chef_mesh.rotation.z = sin(walk_phase) * 0.045
 		held_visual.position.y = held_item_offset.y + abs(sin(walk_phase)) * 0.035
 		if held_item == "Empty hands":
-			_play_beaver_animation(["Idle_Walk"])
+			_play_beaver_animation(["Walk"])
 		else:
-			_play_beaver_animation(["IdleCarry_Walk"])
+			_play_beaver_animation(["WalkCarry"])
 	else:
 		walk_phase = 0.0
 		chef_mesh.position.y = lerpf(chef_mesh.position.y, 0.0, delta * 12.0)
 		chef_mesh.rotation.z = lerpf(chef_mesh.rotation.z, 0.0, delta * 12.0)
 		held_visual.position.y = lerpf(held_visual.position.y, held_item_offset.y, delta * 12.0)
 		if held_item == "Empty hands":
-			_play_beaver_animation(["Idle_Swim", "Idle_Walk"])
+			_play_beaver_animation(["Idle_Walk"])
 		else:
-			_play_beaver_animation(["IdleCarry_Swim", "IdleCarry_Walk"])
+			_play_beaver_animation(["IdleCarry_Walk"])
 
 func _update_action_animation(delta: float) -> void:
 	if cutting_remaining > 0.0 and knife_visual:
@@ -581,56 +784,34 @@ func _update_nearest_station() -> void:
 
 # Interaction logic for all items and recipes
 func _interact(station_id: String) -> void:
+	if station_id == "trash":
+		if held_item != "Empty hands":
+			_set_held_item("Empty hands")
+			_start_put_animation()
+		_update_hud()
+		return
+
+	if INGREDIENT_STATIONS.has(station_id):
+		var ingredient: String = INGREDIENT_STATIONS[station_id]
+		if held_item == "Empty hands":
+			_set_held_item(ingredient)
+			_start_put_animation()
+		elif held_item == ingredient:
+			_set_held_item("Empty hands")
+			_start_put_animation()
+		_update_hud()
+		return
+
 	match station_id:
-		"fish_crate":
-			if held_item == "Empty hands":
-				_set_held_item("Fish")
-				_start_put_animation()
-			elif held_item == "Fish":
-				_set_held_item("Empty hands")
-				_start_put_animation()
-
-		"carrot_crate":
-			if held_item == "Empty hands":
-				_set_held_item("Carrot")
-				_start_put_animation()
-			elif held_item == "Carrot":
-				_set_held_item("Empty hands")
-				_start_put_animation()
-
-		"potato_crate":
-			if held_item == "Empty hands":
-				_set_held_item("Potato")
-				_start_put_animation()
-			elif held_item == "Potato":
-				_set_held_item("Empty hands")
-				_start_put_animation()
-
-		"dough_crate":
-			if held_item == "Empty hands":
-				_set_held_item("Dough")
-				_start_put_animation()
-			elif held_item == "Dough":
-				_set_held_item("Empty hands")
-				_start_put_animation()
-
-		"mayo_crate":
-			if held_item == "Empty hands":
-				_set_held_item("Mayonnaise")
-				_start_put_animation()
-			elif held_item == "Mayonnaise":
-				_set_held_item("Empty hands")
-				_start_put_animation()
-
 		"cut":
-			if held_item in ["Chopped carrot", "Chopped potato"]:
+			if held_item == "Chopped fish":
 				if not board_has_item and not board_has_chopped_item:
 					board_has_chopped_item = true
 					current_board_ingredient = held_item.replace("Chopped ", "").capitalize()
 					_set_held_item("Empty hands")
 					_update_board_visual()
 					_start_put_animation()
-			elif held_item in ["Carrot", "Potato"]:
+			elif held_item == "Fish":
 				if not board_has_item and not board_has_chopped_item:
 					board_has_item = true
 					current_board_ingredient = held_item
@@ -647,36 +828,8 @@ func _interact(station_id: String) -> void:
 				cutting_remaining = 2.0
 				_update_cutting_animation()
 
-		"cook":
-			if held_item == "Plate" and dish_ready:
-				dish_ready = false
-				_set_held_item(current_cooking_recipe)
-				current_cooking_recipe = ""
-				_start_put_animation()
-				_update_pot_animation()
-			elif held_item == "Fish" or held_item == "Chopped carrot":
-				if cooking_remaining > 0.0 or dish_ready:
-					return
-				# Vaříme Rybí polévku
-				current_cooking_recipe = RECIPES["Rybí polévka"]["result_item"]
-				cooking_remaining = RECIPES["Rybí polévka"]["prep_time"]
-				_set_held_item("Empty hands")
-				_start_put_animation()
-				_update_pot_animation()
-
-		"oven":
-			if held_item == "Plate" and oven_ready:
-				oven_ready = false
-				_set_held_item("Cookies")
-				_start_put_animation()
-				_update_oven_animation()
-			elif held_item == "Dough":
-				if baking_remaining > 0.0 or oven_ready:
-					return
-				baking_remaining = RECIPES["Vánoční cukroví"]["prep_time"]
-				_set_held_item("Empty hands")
-				_start_put_animation()
-				_update_oven_animation()
+		"cook", "oven", "mixer", "pan":
+			_interact_with_prep_station(station_id)
 
 		"plates":
 			if held_item == "Plate":
@@ -685,9 +838,13 @@ func _interact(station_id: String) -> void:
 			elif held_item == "Empty hands":
 				_set_held_item("Plate")
 				_start_put_animation()
+			elif _is_recipe_result(held_item) and not held_item_on_plate:
+				held_item_on_plate = true
+				_update_held_visual()
+				_start_put_animation()
 
 		"serve":
-			if held_item in ["Fish soup", "Potato salad", "Cookies"]:
+			if _is_recipe_result(held_item) and held_item_on_plate:
 				if orders.is_empty():
 					return
 				var top_order = orders[0]
@@ -704,6 +861,78 @@ func _interact(station_id: String) -> void:
 					_start_put_animation()
 					_spawn_order()
 	_update_hud()
+
+func _interact_with_prep_station(station_id: String) -> void:
+	if ready_dishes.has(station_id):
+		if held_item != "Empty hands":
+			return
+		var result: String = ready_dishes[station_id]
+		ready_dishes.erase(station_id)
+		active_recipes.erase(station_id)
+		station_ingredients.erase(station_id)
+		_set_held_item(result)
+		_start_put_animation()
+		_update_prep_animation(station_id)
+		return
+	if held_item == "Plate" or held_item == "Empty hands":
+		return
+	if station_remaining.get(station_id, 0.0) > 0.0 or ready_dishes.has(station_id):
+		return
+
+	var current_ingredients: Array = station_ingredients.get(station_id, []).duplicate()
+	var matching_process := ""
+	var process_names: Array = PREPARATIONS.keys()
+	process_names.append_array(RECIPES.keys())
+	for process_name in process_names:
+		var process: Dictionary = _get_process_info(process_name)
+		var process_ingredients: Array = process["ingredients"]
+		if process["station"] != station_id or held_item not in process_ingredients:
+			continue
+		if held_item in current_ingredients:
+			continue
+		var compatible := true
+		for current_ingredient in current_ingredients:
+			if current_ingredient not in process_ingredients:
+				compatible = false
+				break
+		if compatible:
+			matching_process = process_name
+			break
+	if matching_process.is_empty():
+		return
+
+	current_ingredients.append(held_item)
+	_set_held_item("Empty hands")
+	_start_put_animation()
+	var selected_process: Dictionary = _get_process_info(matching_process)
+	if current_ingredients.size() == selected_process["ingredients"].size():
+		station_ingredients.erase(station_id)
+		active_recipes[station_id] = matching_process
+		var prep_time: float = selected_process["prep_time"]
+		if prep_time == 0.0:
+			ready_dishes[station_id] = selected_process["result_item"]
+		else:
+			station_remaining[station_id] = prep_time
+	else:
+		station_ingredients[station_id] = current_ingredients
+	_update_prep_animation(station_id)
+
+func _get_process_info(process_name: String) -> Dictionary:
+	if PREPARATIONS.has(process_name):
+		return PREPARATIONS[process_name]
+	return RECIPES[process_name]
+
+func _is_recipe_result(item: String) -> bool:
+	for recipe in RECIPES.values():
+		if recipe["result_item"] == item:
+			return true
+	return false
+
+func _is_preparation_result(item: String) -> bool:
+	for preparation in PREPARATIONS.values():
+		if preparation["result_item"] == item:
+			return true
+	return false
 
 func _spawn_order() -> void:
 	var recipe_keys := RECIPES.keys()
@@ -732,23 +961,16 @@ func _tick() -> void:
 			board_has_chopped_item = true
 			_update_board_visual()
 
-	if cooking_remaining > 0.0:
-		cooking_remaining = maxf(0.0, cooking_remaining - 1.0)
-		_update_pot_animation()
-		if cooking_remaining == 0.0:
-			dish_ready = true
-			if pot_animation:
-				pot_animation.visible = true
-				pot_progress_label.text = "READY!"
-
-	if baking_remaining > 0.0:
-		baking_remaining = maxf(0.0, baking_remaining - 1.0)
-		_update_oven_animation()
-		if baking_remaining == 0.0:
-			oven_ready = true
-			if oven_animation:
-				oven_animation.visible = true
-				oven_progress_label.text = "READY!"
+	for station_id in station_remaining.keys():
+		var remaining: float = maxf(0.0, station_remaining[station_id] - 1.0)
+		if remaining == 0.0:
+			var process_name: String = active_recipes[station_id]
+			var process: Dictionary = _get_process_info(process_name)
+			ready_dishes[station_id] = process["result_item"]
+			station_remaining.erase(station_id)
+		else:
+			station_remaining[station_id] = remaining
+		_update_prep_animation(station_id)
 
 	for order in orders:
 		order.patience = maxi(0, order.patience - 1)
@@ -872,23 +1094,24 @@ func _restart() -> void:
 	score = 0
 	combo = 0
 	time_left = 120
-	chef.position = Vector3(0, 0.65, 2.5)
+	chef.position = Vector3.ZERO
 	chef.velocity = Vector3.ZERO
-	cooking_remaining = 0.0
-	baking_remaining = 0.0
+	station_ingredients.clear()
+	station_remaining.clear()
+	ready_dishes.clear()
+	active_recipes.clear()
 	cutting_remaining = 0.0
 	board_has_item = false
 	board_has_chopped_item = false
-	dish_ready = false
-	oven_ready = false
+	current_board_ingredient = ""
 	orders.clear()
 	next_order_id = 1
 	_spawn_order()
 	timer.start()
 	_set_held_item("Empty hands")
 	_start_put_animation()
-	_update_pot_animation()
-	_update_oven_animation()
+	for station_id in prep_animations:
+		_update_prep_animation(station_id)
 	_update_cutting_animation()
 	_update_board_visual()
 	pause_overlay.visible = false
@@ -929,6 +1152,7 @@ func _finish_game() -> void:
 
 func _set_held_item(item: String) -> void:
 	held_item = item
+	held_item_on_plate = false
 	_update_held_visual()
 	_update_hud()
 
@@ -938,44 +1162,42 @@ func _start_put_animation() -> void:
 func _update_held_visual() -> void:
 	if not item_visual or not plate_visual:
 		return
-		
-	item_visual.visible = held_item in ["Fish", "Carrot", "Potato", "Dough", "Mayonnaise"]
-	chopped_visual.visible = held_item in ["Chopped carrot", "Chopped potato"]
-	plate_visual.visible = held_item in ["Plate", "Fish soup", "Potato salad", "Cookies"]
-	
-	if held_item == "Fish":
-		item_visual.material_override = _material(Color("#3b6ba5"))
-	elif held_item == "Carrot":
-		item_visual.material_override = _material(Color("#e67e22"))
-	elif held_item == "Potato":
-		item_visual.material_override = _material(Color("#c49142"))
-	elif held_item == "Dough":
-		item_visual.material_override = _material(Color("#dfc086"))
-	elif held_item == "Mayonnaise":
-		item_visual.material_override = _material(Color("#ffffff"))
-	elif held_item == "Fish soup":
-		item_visual.visible = true
-		item_visual.material_override = _material(Color("#3b6ba5"))
-	elif held_item == "Potato salad":
-		item_visual.visible = true
-		item_visual.material_override = _material(Color("#f2c56b"))
-	elif held_item == "Cookies":
-		item_visual.visible = true
-		item_visual.material_override = _material(Color("#d5a74c"))
+
+	var is_chopped := held_item == "Chopped fish"
+	var is_ingredient: bool = held_item in INGREDIENT_STATIONS.values()
+	var is_result := _is_recipe_result(held_item)
+	var is_prepared_ingredient := _is_preparation_result(held_item)
+	item_visual.visible = is_ingredient or is_result or is_prepared_ingredient
+	chopped_visual.visible = is_chopped
+	plate_visual.visible = held_item == "Plate" or (is_result and held_item_on_plate)
+	if is_chopped:
+		var chopped_colors := {
+			"Chopped fish": "#3b6ba5"
+		}
+		chopped_visual.material_override = _material(Color(chopped_colors[held_item]))
+	if not item_visual.visible:
+		return
+
+	var item_colors := {
+		"Fish": "#3b6ba5",
+		"Potato": "#c49142",
+		"Boiled potato": "#c49142",
+		"Dough": "#dfc086",
+		"Mayonnaise": "#ffffff",
+		"Sugar": "#f4f0e5"
+	}
+	var item_color := Color(item_colors.get(held_item, "#ed514b"))
+	for recipe in RECIPES.values():
+		if recipe["result_item"] == held_item:
+			item_color = Color(recipe["color"])
+			break
+	item_visual.material_override = _material(item_color)
 
 func _update_board_visual() -> void:
-	if board_whole_visual:
-		board_whole_visual.visible = board_has_item
-		if board_has_item:
-			if current_board_ingredient == "Carrot":
-				board_whole_visual.material_override = _material(Color("#e67e22"))
-			elif current_board_ingredient == "Potato":
-				board_whole_visual.material_override = _material(Color("#c49142"))
-				
-	if board_chopped_visual:
-		board_chopped_visual.visible = board_has_chopped_item
-		if board_has_chopped_item:
-			if current_board_ingredient == "Carrot":
-				board_chopped_visual.material_override = _material(Color("#e67e22"))
-			elif current_board_ingredient == "Potato":
-				board_chopped_visual.material_override = _material(Color("#c49142"))
+	if not board_food_visual:
+		return
+	board_food_visual.visible = board_has_item or board_has_chopped_item
+	if board_has_chopped_item:
+		board_food_visual.scale = Vector3(0.22, 0.07, 0.2)
+	else:
+		board_food_visual.scale = Vector3(0.34, 0.12, 0.13)
