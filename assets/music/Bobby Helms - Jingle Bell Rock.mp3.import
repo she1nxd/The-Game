@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://cny734uhuj0xw"
+path="res://.godot/imported/Bobby Helms - Jingle Bell Rock.mp3-18e63dc17da6b18657c11ca8ec719fe2.mp3str"
+
+[deps]
+
+source_file="res://assets/music/Bobby Helms - Jingle Bell Rock.mp3"
+dest_files=["res://.godot/imported/Bobby Helms - Jingle Bell Rock.mp3-18e63dc17da6b18657c11ca8ec719fe2.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

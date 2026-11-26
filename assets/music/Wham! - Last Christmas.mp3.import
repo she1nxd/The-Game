@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://c4yq3l2wy22ua"
+path="res://.godot/imported/Wham! - Last Christmas.mp3-67f394c085a18735606ca73b14dcfae1.mp3str"
+
+[deps]
+
+source_file="res://assets/music/Wham! - Last Christmas.mp3"
+dest_files=["res://.godot/imported/Wham! - Last Christmas.mp3-67f394c085a18735606ca73b14dcfae1.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

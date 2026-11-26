@@ -2,21 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bea6bx83wdr6o"
-path.s3tc="res://.godot/imported/head_m_metallicRoughness.png-195c80843bc308b360f7cca0841f7eb2.s3tc.ctex"
+uid="uid://b2dpi4gjxgvu3"
+path="res://.godot/imported/mixer.png-4ee88f8ea750c7263e6ab7f8821f8039.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/pug/textures/head_m_metallicRoughness.png"
-dest_files=["res://.godot/imported/head_m_metallicRoughness.png-195c80843bc308b360f7cca0841f7eb2.s3tc.ctex"]
+source_file="res://assets/kitchen_images/mixer.png"
+dest_files=["res://.godot/imported/mixer.png-4ee88f8ea750c7263e6ab7f8821f8039.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -24,7 +23,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=true
+mipmaps/generate=false
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""
@@ -38,4 +37,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=0
+detect_3d/compress_to=1
