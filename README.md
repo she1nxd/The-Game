@@ -27,7 +27,7 @@ Postup přípravy se zobrazuje nad příslušnou stanicí. Suroviny se berou z b
 
 ### Export samostatné hry
 
-V Godot editoru otevřete **Project → Export**, přidejte exportní preset pro cílový operační systém a zvolte **Export Project**. Na jiném počítači pak spusťte vytvořený soubor. Exportní šablony pro daný systém musí být v Godotu nainstalované.
+Stáhněte si složku .exe a spusťte soubor Home for Christmas.exe; je důležité, aby byl uložen společně se souborem Home for Christmas.pck.
 
 ## Použité technologie
 
@@ -39,13 +39,9 @@ V Godot editoru otevřete **Project → Export**, přidejte exportní preset pro
 
 ## Ruční testovací scénář
 
-Opakovatelný scénář je v [MANUAL_TESTS.md](MANUAL_TESTS.md). Před odevzdáním jej spusťte na cílové verzi Godotu a zaznamenejte výsledek.
+Opakovatelný scénář je v [MANUAL_TESTS.md](MANUAL_TESTS.md).
 
 ## Použité modely
 
 - Bobr: „Beaver Inc, Global Game Jam 2020“ od Edriviel, licence CC BY 4.0. Podrobnosti a požadovaná atribuce jsou v `assets/beaver/license.txt`.
 - Vánoční strom: „Christmas Tree POLYCRAFT“ od LowlyPoly, licence CC BY 4.0. Podrobnosti a požadovaná atribuce jsou v `assets/christmas_tree/license.txt`.
-
-## Odevzdávací poznámky
-
-Design dokument je v [DESIGN.md](DESIGN.md). Deník selhání AI a retrospektiva jsou připravené jako osobní návrhy v [AI_FAILURE_DIARY.md](AI_FAILURE_DIARY.md) a [RETROSPECTIVE.md](RETROSPECTIVE.md); každý student je musí zkontrolovat a odevzdat samostatně. Historie Git obsahuje příspěvky autorů `she1nxd` a `nevim-nevim`; ověřte, že odpovídají všem členům týmu.
