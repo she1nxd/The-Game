@@ -1,6 +1,0 @@
-1. Change boxes to 3D models
-2. Implement images to orders
-3. Add new recipes
-4. Add new stations (pan, mix, etc.)
-5. Add Christmas vibe (tree, lighting, etc.)
-6. Think about new mechanics like buying food or something
