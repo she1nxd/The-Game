@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://yexf38tqk3as"]
+
+[ext_resource type="Script" uid="uid://d1ytx5libctxk" path="res://main.gd" id="1"]
+
+[node name="MerryMeals3D" type="Node3D" unique_id=900415052]
+script = ExtResource("1")

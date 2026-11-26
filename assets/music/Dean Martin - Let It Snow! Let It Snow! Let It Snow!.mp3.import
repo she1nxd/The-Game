@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://blhripvdea8ve"
+path="res://.godot/imported/Dean Martin - Let It Snow! Let It Snow! Let It Snow!.mp3-e0c19eb86035b07b30a27ca46ba575db.mp3str"
+
+[deps]
+
+source_file="res://assets/music/Dean Martin - Let It Snow! Let It Snow! Let It Snow!.mp3"
+dest_files=["res://.godot/imported/Dean Martin - Let It Snow! Let It Snow! Let It Snow!.mp3-e0c19eb86035b07b30a27ca46ba575db.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
